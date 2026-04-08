@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Revryze Sales Center Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Error banner -->
+  <div id="error-banner" class="error-banner hidden"></div>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-brand">
+      <h1 class="logo">REVRYZE</h1>
+      <span class="logo-sub">Sales Center</span>
+    </div>
+    <div class="header-controls">
+      <select id="location-select" class="control-select">
+        <option value="">Loading clients…</option>
+      </select>
+      <select id="pipeline-select" class="control-select">
+        <option value="">All pipelines</option>
+      </select>
+      <select id="date-range-select" class="control-select">
+        <option value="7">Last 7 days</option>
+        <option value="30" selected>Last 30 days</option>
+        <option value="90">Last 90 days</option>
+      </select>
+      <button id="manage-reps-btn" class="btn btn-primary">Manage Reps</button>
+    </div>
+  </header>
+
+  <!-- Metrics bar -->
+  <section class="metrics-bar">
+    <div class="metric-card">
+      <div class="metric-value" id="metric-sold">—</div>
+      <div class="metric-label">Memberships Sold</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value" id="metric-revenue">—</div>
+      <div class="metric-label">Revenue Closed</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value" id="metric-appts">—</div>
+      <div class="metric-label">Appointments Set</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value" id="metric-calls">—</div>
+      <div class="metric-label">Total Calls</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value" id="metric-close">—</div>
+      <div class="metric-label">Close Rate</div>
+    </div>
+  </section>
+
+  <!-- Main grid -->
+  <main class="main-grid">
+    <!-- Left: Leaderboard -->
+    <section class="panel leaderboard-panel">
+      <div class="panel-header">
+        <h2 class="panel-title">Leaderboard</h2>
+        <select id="leaderboard-sort" class="control-select control-select-sm">
+          <option value="sold">Memberships Sold</option>
+          <option value="revenue">Revenue</option>
+          <option value="appointments">Appointments</option>
+          <option value="calls">Call Volume</option>
+        </select>
+      </div>
+      <div id="leaderboard-list" class="leaderboard-list">
+        <div class="empty-state" id="leaderboard-empty">
+          Click <strong>Manage Reps</strong> to set up your team
+        </div>
+      </div>
+    </section>
+
+    <!-- Right column -->
+    <div class="right-column">
+      <!-- Call log -->
+      <section class="panel call-log-panel">
+        <div class="panel-header">
+          <h2 class="panel-title" id="call-log-title">Call Log</h2>
+          <div class="filter-tabs" id="call-filter-tabs">
+            <button class="filter-tab active" data-filter="all">All</button>
+            <button class="filter-tab" data-filter="outbound">Outbound</button>
+            <button class="filter-tab" data-filter="inbound">Inbound</button>
+            <button class="filter-tab" data-filter="missed">Missed</button>
+          </div>
+        </div>
+        <div id="call-log-list" class="call-log-list">
+          <div class="empty-state">Select a rep to view their calls</div>
+        </div>
+      </section>
+
+      <!-- Call detail (hidden) -->
+      <section class="panel call-detail-panel hidden" id="call-detail-panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Call Detail</h2>
+          <button class="btn btn-sm btn-close-detail" id="close-detail-btn">&times;</button>
+        </div>
+        <div class="call-detail-meta" id="call-detail-meta"></div>
+        <div class="audio-player" id="audio-player">
+          <button class="btn btn-play" id="play-pause-btn">&#9654;</button>
+          <div class="progress-container" id="progress-container">
+            <div class="progress-bar" id="progress-bar"></div>
+          </div>
+          <span class="time-display" id="time-display">0:00 / 0:00</span>
+          <audio id="audio-el"></audio>
+        </div>
+        <div class="transcript-viewer" id="transcript-viewer">
+          <h3 class="transcript-title">Transcript</h3>
+          <div class="transcript-text" id="transcript-text">No transcript available</div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Manage Reps Modal -->
+  <div class="modal-overlay hidden" id="reps-modal-overlay">
+    <div class="modal" id="reps-modal">
+      <div class="modal-header">
+        <h2>Manage Reps</h2>
+        <button class="btn btn-sm btn-close-detail" id="close-modal-btn">&times;</button>
+      </div>
+      <div class="modal-body" id="reps-modal-body">
+        <p>Loading users…</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancel-reps-btn">Cancel</button>
+        <button class="btn btn-primary" id="save-reps-btn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
