@@ -107,14 +107,12 @@
   }
 
   // ─── Call Direction / Outcome ────────────────────────────────────────────────
-  function getCallDir(conv) {
-    const d = (conv.lastMessageDirection || conv.direction || '').toLowerCase();
+  function getCallDir(call) {
+    const d = (call.direction || '').toLowerCase();
     if (d === 'outbound' || d === 'outgoing') return 'outbound';
-    const missed = (conv.status || '').toLowerCase() === 'missed' ||
-      (conv.lastMessageBody || '').toLowerCase().includes('missed') ||
-      conv.missed === true;
-    if (missed) return 'missed';
     if (d === 'inbound' || d === 'incoming') return 'inbound';
+    const missed = (call.callStatus || '').toLowerCase() === 'missed' || call.missed === true;
+    if (missed) return 'missed';
     return 'outbound';
   }
 
@@ -142,13 +140,12 @@
     return appData.calls.filter(c => {
       if (filters.clientId !== 'all' && c._clientId !== filters.clientId) return false;
       if (filters.pipelineId !== 'all') {
-        // pipeline filter on calls: only include calls from clients that have this pipeline
         const clientsWithPipeline = appData.config.clients.filter(cl =>
           cl.pipelines.some(p => p.pipelineId === filters.pipelineId)
         ).map(cl => cl.locationId);
         if (!clientsWithPipeline.includes(c._clientId)) return false;
       }
-      const d = parseDate(c.lastMessageDate || c.dateUpdated || c.dateAdded);
+      const d = parseDate(c.dateAdded);
       if (d && d < cutoff) return false;
       if (filters.repId && c.assignedTo !== filters.repId) return false;
       return true;
@@ -215,10 +212,10 @@
       );
 
       const callFetches = clients.map(client =>
-        apiFetch(`/api/locations/${client.locationId}/calls?startDate=${encodeURIComponent(startDate)}`)
+        apiFetch(`/api/locations/${client.locationId}/calls`)
           .then(d => ({
             clientId: client.locationId,
-            calls: d.conversations || [],
+            calls: d.calls || [],
             error: null,
           }))
           .catch(err => ({ clientId: client.locationId, calls: [], error: err.message }))
@@ -244,11 +241,11 @@
           appData.calls.push({ ...c, _clientId: r.clientId });
         });
       });
-      // Bug 1: deduplicate by conversation id (GHL may return same convo more than once)
+      // Deduplicate by conversationId
       {
         const seen = new Map();
         appData.calls = appData.calls.filter(c => {
-          const key = c.id || c._id;
+          const key = c.conversationId;
           if (!key || seen.has(key)) return false;
           seen.set(key, true);
           return true;
@@ -571,11 +568,11 @@
     }
   }
 
-  function callOutcomeBadge(conv, contactOppMap) {
-    const cid = conv.contactId;
+  function callOutcomeBadge(call, contactOppMap) {
+    const cid = call.contactId;
     const opps = cid ? (contactOppMap[cid] || []) : [];
     if (opps.length === 0) {
-      const dir = getCallDir(conv);
+      const dir = getCallDir(call);
       const label = dir === 'outbound' ? 'Outbound' : dir === 'missed' ? 'Missed' : 'Inbound';
       return `<span class="badge badge-gray">${label}</span>`;
     }
@@ -588,87 +585,39 @@
     return `<span class="badge badge-pipeline">In Pipeline</span>`;
   }
 
-  // Bug 2: batch-fetch call message durations for displayed rows, concurrency 10
-  // Only fetches the first 30 visible conversations to avoid GHL rate limits.
-  // Durations are cached in appData.callDurations and update rows in-place.
-  async function fetchCallDurations(displayed) {
-    const pending = displayed.slice(0, 30).filter(c => {
-      const key = c.id || c._id;
-      return key && appData.callDurations[key] === undefined;
-    });
-    for (let i = 0; i < pending.length; i += 5) {
-      const batch = pending.slice(i, i + 5);
-      await Promise.all(batch.map(async conv => {
-        const convId = conv.id || conv._id;
-        try {
-          const data = await apiFetch(
-            `/api/conversations/${encodeURIComponent(convId)}/messages?locationId=${encodeURIComponent(conv._clientId)}`
-          );
-          const msgs = Array.isArray(data.messages) ? data.messages : [];
-          const callMsg = msgs.find(m => m.messageType === 'TYPE_CALL');
-          appData.callDurations[convId] = callMsg?.meta?.callDuration || 0;
-        } catch (_) {
-          appData.callDurations[convId] = 0;
-        }
-        // Update the row in-place if still visible
-        const row = $callList.querySelector(`[data-conv-id="${CSS.escape(convId)}"]`);
-        if (row) {
-          const dur = appData.callDurations[convId];
-          const durStr = dur > 0
-            ? `${Math.floor(dur / 60)}m ${String(Math.floor(dur % 60)).padStart(2, '0')}s`
-            : '—';
-          const timeEl = row.querySelector('.call-time');
-          if (timeEl) {
-            const dateStr = formatDate(conv.lastMessageDate || conv.dateUpdated || conv.dateAdded);
-            timeEl.textContent = `${dateStr} · ${durStr}`;
-          }
-        }
-      }));
-      // Pause between batches to stay within GHL rate limits
-      if (i + 5 < pending.length) await new Promise(r => setTimeout(r, 1000));
-    }
-  }
-
   function renderCallLog(calls, contactOppMap) {
     updateCallLogTitle();
 
     let displayed = calls;
     if (filters.callDir !== 'all') {
-      displayed = calls.filter(c => {
-        const dir = getCallDir(c);
-        return dir === filters.callDir;
-      });
+      displayed = calls.filter(c => getCallDir(c) === filters.callDir);
     }
 
     if (displayed.length === 0) {
-      $callList.innerHTML = emptyState('No activity found for this period');
+      $callList.innerHTML = emptyState('No calls found for this period');
       return;
     }
 
     displayed.sort((a, b) => {
-      const da = parseDate(a.lastMessageDate || a.dateUpdated || a.dateAdded);
-      const db = parseDate(b.lastMessageDate || b.dateUpdated || b.dateAdded);
+      const da = parseDate(a.dateAdded);
+      const db = parseDate(b.dateAdded);
       if (!da && !db) return 0;
       if (!da) return 1;
       if (!db) return -1;
       return db - da;
     });
 
-    const clientMap = {};
-    appData.config.clients.forEach(c => { clientMap[c.locationId] = c; });
-
-    $callList.innerHTML = displayed.map(conv => {
-      const dir = getCallDir(conv);
-      const contactName = conv.contactName || conv.fullName || conv.phone || 'Unknown';
-      const dateStr = formatDate(conv.lastMessageDate || conv.dateUpdated || conv.dateAdded);
-      const badge = callOutcomeBadge(conv, contactOppMap);
-      const convId = conv.id || conv._id;
-      const cachedDur = appData.callDurations[convId];
-      const durStr = (cachedDur > 0)
-        ? `${Math.floor(cachedDur / 60)}m ${String(Math.floor(cachedDur % 60)).padStart(2, '0')}s`
+    $callList.innerHTML = displayed.map(call => {
+      const dir = getCallDir(call);
+      const contactName = call.contactName || call.phone || 'Unknown';
+      const dateStr = formatDate(call.dateAdded);
+      const badge = callOutcomeBadge(call, contactOppMap);
+      const dur = call.callDuration || 0;
+      const durStr = dur > 0
+        ? `${Math.floor(dur / 60)}m ${String(Math.floor(dur % 60)).padStart(2, '0')}s`
         : '—';
       return `
-        <div class="call-row" data-conv-id="${escHtml(convId)}" data-client-id="${conv._clientId}">
+        <div class="call-row" data-conv-id="${escHtml(call.conversationId)}" data-client-id="${escHtml(call._clientId)}">
           <div class="dir-dot ${dir}"></div>
           <div class="call-info">
             <div class="call-contact">${escHtml(contactName)}</div>
@@ -677,9 +626,6 @@
           ${badge}
         </div>`;
     }).join('');
-
-    // Bug 2: fetch durations for displayed rows in background (updates rows in-place)
-    fetchCallDurations(displayed).catch(() => {});
 
     $callList.querySelectorAll('.call-row').forEach(row => {
       row.addEventListener('click', () => {
@@ -694,82 +640,45 @@
   async function openCallDetail(convId, clientId) {
     $callDetail.classList.remove('hidden');
     resetAudioPlayer();
-    $transcriptText.textContent = 'Loading…';
+    $transcriptText.textContent = 'Loading transcript…';
 
-    const conv = appData.calls.find(c => (c.id || c._id) === convId);
+    const call = appData.calls.find(c => c.conversationId === convId);
     const clientCfg = appData.config.clients.find(c => c.locationId === clientId);
-    const contactName = conv ? (conv.contactName || conv.fullName || conv.phone || 'Unknown') : 'Unknown';
-    const phone = conv ? (conv.phone || conv.contactPhone || '—') : '—';
-    const dateStr = conv ? formatDate(conv.lastMessageDate || conv.dateUpdated || conv.dateAdded) : '';
+    const contactName = call ? (call.contactName || call.phone || 'Unknown') : 'Unknown';
+    const phone = call ? (call.phone || '—') : '—';
+    const dateStr = call ? formatDate(call.dateAdded) : '';
     const clientName = clientCfg ? clientCfg.name : (clientId || '');
-
-    const pipelineName = (() => {
-      if (!clientCfg || !conv) return '';
-      const p = clientCfg.pipelines.find(pp => pp.pipelineId === conv.pipelineId);
-      return p ? p.name : '';
-    })();
-
-    const location = [clientName, pipelineName].filter(Boolean).join(' — ');
 
     $callMeta.innerHTML = `
       <strong>${escHtml(contactName)}</strong>
       <span>${escHtml(phone)}</span>
       <span>${dateStr}</span>
-      ${location ? `<span>${escHtml(location)}</span>` : ''}
+      ${clientName ? `<span>${escHtml(clientName)}</span>` : ''}
     `;
 
-    try {
-      const data = await apiFetch(
-        `/api/conversations/${encodeURIComponent(convId)}/messages?locationId=${encodeURIComponent(clientId)}`
-      );
-      const messages = Array.isArray(data.messages) ? data.messages : [];
+    const messageId = call ? call.messageId : null;
 
-      // Bug 4: find the TYPE_CALL message first — it carries recording + transcript
-      const callMsg = messages.find(m => m.messageType === 'TYPE_CALL');
+    // Load recording via official messageId endpoint
+    if (messageId) {
+      $audioEl.src = `/api/recording?messageId=${encodeURIComponent(messageId)}&locationId=${encodeURIComponent(clientId)}`;
+      $audioEl.load();
+    }
 
-      // Recording URL: prefer TYPE_CALL meta, then any message meta, then attachments
-      let recordingUrl = callMsg?.meta?.recordingUrl || '';
-      if (!recordingUrl) {
-        for (const msg of messages) {
-          if (msg.meta?.recordingUrl) { recordingUrl = msg.meta.recordingUrl; break; }
-          if (msg.attachments) {
-            for (const att of msg.attachments) {
-              if (att.url) { recordingUrl = att.url; break; }
-            }
-          }
-          if (recordingUrl) break;
-        }
-      }
-
-      // Transcript: prefer TYPE_CALL meta.transcriptionText, then TYPE_CALL body,
-      // then any TYPE_ACTIVITY_CONTACT message body
-      let transcript = callMsg?.meta?.transcriptionText || callMsg?.body || '';
-      if (!transcript) {
-        const actMsg = messages.find(m =>
-          m.messageType === 'TYPE_ACTIVITY_CONTACT' && m.body && m.body.trim()
+    // Load transcript via official messageId endpoint
+    if (messageId) {
+      try {
+        const tData = await apiFetch(
+          `/api/transcription?messageId=${encodeURIComponent(messageId)}&locationId=${encodeURIComponent(clientId)}`
         );
-        if (actMsg) transcript = actMsg.body;
+        // GHL may return { transcriptionText: "..." } or { text: "..." } or similar
+        const text = tData.transcriptionText || tData.text || tData.transcript ||
+          (typeof tData === 'string' ? tData : null);
+        $transcriptText.textContent = text || 'No transcript available';
+      } catch (_) {
+        $transcriptText.textContent = 'No transcript available';
       }
-      if (!transcript) {
-        // last resort: any message with transcriptionText
-        for (const msg of messages) {
-          if (msg.meta?.transcriptionText) { transcript = msg.meta.transcriptionText; break; }
-        }
-      }
-
-      // Cache duration for the call row if we have it
-      const dur = callMsg?.meta?.callDuration || 0;
-      if (dur > 0) appData.callDurations[convId] = dur;
-
-      if (recordingUrl) {
-        $audioEl.src = `/api/recording?url=${encodeURIComponent(recordingUrl)}&locationId=${encodeURIComponent(clientId)}`;
-        $audioEl.load();
-      }
-
-      $transcriptText.textContent = transcript || 'No transcript available';
-    } catch (err) {
-      showError('Failed to load call detail: ' + err.message);
-      $transcriptText.textContent = 'Could not load transcript';
+    } else {
+      $transcriptText.textContent = 'No transcript available';
     }
   }
 

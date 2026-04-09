@@ -144,45 +144,80 @@ app.get('/api/locations/:locationId/opportunities', async (req, res) => {
 });
 
 // ─── GET /api/locations/:locationId/calls ────────────────────────────────────
+// Searches all conversations sorted by recency, pre-filters to those whose
+// lastMessageType === 'TYPE_CALL', fetches their messages in batches of 10,
+// and returns structured call objects with messageId + meta fields.
 app.get('/api/locations/:locationId/calls', async (req, res) => {
   try {
     const { locationId } = req.params;
-    const { userId } = req.query;
     const clientsData = await loadClientsConfig();
     const client = findClient(clientsData.clients, locationId);
     const apiKey = resolveLocationKey(client);
 
-    // Use /conversations/search — the only working GHL endpoint for this.
-    // Try TYPE_PHONE_CALL first; fall back to TYPE_PHONE if empty.
-    const buildSearchUrl = (type) => {
-      let url = `${GHL_API}/conversations/search?locationId=${locationId}&limit=100&type=${type}`;
-      if (userId) url += `&assignedTo=${encodeURIComponent(userId)}`;
-      return url;
+    const callHeaders = {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      Version: '2021-07-28',
     };
 
-    const fetchPages = async (baseUrl) => {
-      const allConvs = [];
-      let page = 1;
-      let hasMore = true;
-      while (hasMore) {
-        const data = await ghlGet(baseUrl + `&page=${page}`, locationHeaders(apiKey));
-        const convs = data.conversations || [];
-        allConvs.push(...convs);
-        const meta = data.meta || {};
-        hasMore = convs.length === 100 && (meta.total ? allConvs.length < meta.total : true);
-        page++;
-        if (page > 20) break;
-      }
-      return allConvs;
-    };
-
-    // Try TYPE_PHONE_CALL first, fall back to TYPE_PHONE
-    let conversations = await fetchPages(buildSearchUrl('TYPE_PHONE_CALL'));
-    if (conversations.length === 0) {
-      conversations = await fetchPages(buildSearchUrl('TYPE_PHONE'));
+    // Step 1: paginate conversations, sorted by recency (cap at 10 pages = 1000 convos)
+    const allConvs = [];
+    let page = 1;
+    while (true) {
+      const url = `${GHL_API}/conversations/search?locationId=${locationId}&limit=100&sortBy=last_message_date&sortOrder=desc&page=${page}`;
+      const data = await ghlGet(url, callHeaders);
+      const convs = data.conversations || [];
+      allConvs.push(...convs);
+      const meta = data.meta || {};
+      const hasMore = convs.length === 100 && (meta.total ? allConvs.length < meta.total : true);
+      page++;
+      if (!hasMore || page > 10) break;
     }
 
-    res.json({ conversations, total: conversations.length });
+    // Step 2: pre-filter to conversations whose lastMessageType indicates a call
+    const callConvs = allConvs.filter(c =>
+      c.lastMessageType === 'TYPE_CALL' ||
+      c.lastMessageType === 'TYPE_PHONE_CALL' ||
+      c.lastMessageType === 'TYPE_PHONE'
+    );
+
+    // Step 3: fetch messages for each filtered conversation in batches of 10
+    const callObjects = [];
+    for (let i = 0; i < callConvs.length; i += 10) {
+      const batch = callConvs.slice(i, i + 10);
+      const batchResults = await Promise.all(batch.map(async conv => {
+        try {
+          const msgRes = await fetch(`${GHL_API}/conversations/${conv.id}/messages`, { headers: callHeaders });
+          const msgData = await msgRes.json();
+          const messages = Array.isArray(msgData.messages) ? msgData.messages
+            : Array.isArray(msgData.items) ? msgData.items
+            : Array.isArray(msgData) ? msgData : [];
+
+          const callMsg = messages.find(m => m.messageType === 'TYPE_CALL');
+          if (!callMsg) return null;
+
+          return {
+            conversationId: conv.id,
+            messageId: callMsg.id || callMsg.messageId || null,
+            contactName: conv.contactName || conv.fullName || conv.phone || null,
+            contactId: conv.contactId || null,
+            assignedTo: conv.assignedTo || null,
+            phone: conv.phone || conv.contactPhone || null,
+            direction: (callMsg.direction || conv.lastMessageDirection || '').toLowerCase(),
+            dateAdded: callMsg.dateAdded || callMsg.createdAt || conv.lastMessageDate || null,
+            callDuration: callMsg.meta?.callDuration || 0,
+            callStatus: callMsg.meta?.callStatus || null,
+          };
+        } catch (_) {
+          return null;
+        }
+      }));
+      batchResults.forEach(c => { if (c) callObjects.push(c); });
+      // Brief pause between batches to respect rate limits
+      if (i + 10 < callConvs.length) await new Promise(r => setTimeout(r, 300));
+    }
+
+    res.json({ calls: callObjects, total: callObjects.length });
   } catch (err) {
     console.error('GET /api/locations/:id/calls error:', err.message);
     res.status(err.status || 500).json({ error: err.message });
@@ -458,25 +493,36 @@ app.get('/api/all-users', async (req, res) => {
 });
 
 // ─── GET /api/recording ──────────────────────────────────────────────────────
+// Accepts messageId + locationId, uses the official GHL recording endpoint.
+// Falls back to accepting a raw url param for backward-compat.
 app.get('/api/recording', async (req, res) => {
   try {
-    const { url, locationId } = req.query;
-    if (!url) return res.status(400).json({ error: 'url query param required' });
+    const { messageId, locationId, url: rawUrl } = req.query;
     if (!locationId) return res.status(400).json({ error: 'locationId query param required' });
+    if (!messageId && !rawUrl) return res.status(400).json({ error: 'messageId (or url) query param required' });
+
     const clientsData = await loadClientsConfig();
     const client = findClient(clientsData.clients, locationId);
     const apiKey = resolveLocationKey(client);
 
-    const fetchHeaders = { ...locationHeaders(apiKey) };
+    const callHeaders = {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      Version: '2021-07-28',
+    };
     const rangeHeader = req.headers['range'];
-    if (rangeHeader) fetchHeaders['Range'] = rangeHeader;
+    if (rangeHeader) callHeaders['Range'] = rangeHeader;
 
-    const audioRes = await fetch(url, { headers: fetchHeaders });
+    const audioUrl = messageId
+      ? `${GHL_API}/conversations/messages/${messageId}/locations/${locationId}/recording`
+      : rawUrl;
+
+    const audioRes = await fetch(audioUrl, { headers: callHeaders });
     if (!audioRes.ok && audioRes.status !== 206) {
       return res.status(audioRes.status).json({ error: 'Failed to fetch recording' });
     }
 
-    const contentType = audioRes.headers.get('content-type') || 'audio/mpeg';
+    const contentType = audioRes.headers.get('content-type') || 'audio/x-wav';
     const contentLength = audioRes.headers.get('content-length');
     const contentRange = audioRes.headers.get('content-range');
 
@@ -489,6 +535,34 @@ app.get('/api/recording', async (req, res) => {
     audioRes.body.pipe(res);
   } catch (err) {
     console.error('GET /api/recording error:', err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/transcription ───────────────────────────────────────────────────
+// Official GHL transcription endpoint by messageId + locationId.
+app.get('/api/transcription', async (req, res) => {
+  try {
+    const { messageId, locationId } = req.query;
+    if (!messageId) return res.status(400).json({ error: 'messageId query param required' });
+    if (!locationId) return res.status(400).json({ error: 'locationId query param required' });
+
+    const clientsData = await loadClientsConfig();
+    const client = findClient(clientsData.clients, locationId);
+    const apiKey = resolveLocationKey(client);
+
+    const callHeaders = {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      Version: '2021-07-28',
+    };
+
+    const url = `${GHL_API}/conversations/locations/${locationId}/messages/${messageId}/transcription`;
+    const tRes = await fetch(url, { headers: callHeaders });
+    const data = await tRes.json();
+    res.status(tRes.status).json(data);
+  } catch (err) {
+    console.error('GET /api/transcription error:', err.message);
     res.status(err.status || 500).json({ error: err.message });
   }
 });

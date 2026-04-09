@@ -1,0 +1,53 @@
+That's actually really useful information. It means **no conversations in GHL have TYPE_CALL messages** showing up through the conversations API — even though you can clearly see calls in the Call Reporting section.
+
+This tells me GHL stores LC Phone calls in a completely **separate system** from conversations. The Call Reporting page is its own data store, not the conversations API.
+
+Let me find the right endpoint.Now I have the exact official endpoints. Here's what the GHL API docs confirm:
+
+- **Recording:** `GET /conversations/messages/:messageId/locations/:locationId/recording`
+- **Transcription:** `GET /conversations/locations/:locationId/messages/:messageId/transcription`
+
+The key problem is we need **message IDs for TYPE_CALL messages**. We've confirmed conversations exist but the search isn't returning them. The issue is we need to use the **Export Messages** endpoint to find call messages specifically.
+
+Paste this into Replit Agent — this is the definitive fix using the exact official GHL API endpoints:
+
+---
+
+> Rewrite the calls system completely using the correct official GHL API endpoints from their documentation.
+>
+> **The correct flow is:**
+>
+> 1. Search conversations using `GET https://services.leadconnectorhq.com/conversations/search?locationId={locationId}&limit=100` with header `Version: 2021-07-28`
+>
+> 2. For each conversation, get messages using `GET https://services.leadconnectorhq.com/conversations/{conversationId}/messages` and find messages where `messageType === 'TYPE_CALL'`
+>
+> 3. For recording use the EXACT official endpoint: `GET https://services.leadconnectorhq.com/conversations/messages/{messageId}/locations/{locationId}/recording` — this returns `audio/x-wav`
+>
+> 4. For transcription use: `GET https://services.leadconnectorhq.com/conversations/locations/{locationId}/messages/{messageId}/transcription`
+>
+> **Backend changes:**
+>
+> Replace the current `/api/locations/:locationId/calls` endpoint with a new version that:
+> - Searches conversations with `GET https://services.leadconnectorhq.com/conversations/search?locationId={locationId}&limit=100&sortBy=last_message_date&sortOrder=desc`
+> - For each conversation fetches messages and checks for `messageType === 'TYPE_CALL'`
+> - Returns only conversations containing at least one call message
+> - Includes for each call: conversationId, messageId (of the TYPE_CALL message), contactName, contactId, direction, dateAdded, `meta.callDuration`, `meta.callStatus`
+> - Processes in batches of 10 with Promise.all to avoid rate limits
+>
+> Update `/api/recording` to use the exact official URL format:
+> `GET https://services.leadconnectorhq.com/conversations/messages/{messageId}/locations/{locationId}/recording`
+> Accept `messageId` and `locationId` as query params. Pipe the response directly with `Content-Type: audio/x-wav` and `Accept-Ranges: bytes`.
+>
+> Add `/api/transcription?messageId=&locationId=` that hits:
+> `GET https://services.leadconnectorhq.com/conversations/locations/{locationId}/messages/{messageId}/transcription`
+> and returns the transcription text.
+>
+> **Frontend changes:**
+> - Call log fetches from the updated `/api/locations/:locationId/calls`
+> - Each call row shows: contact name, date, duration from `meta.callDuration` formatted as "Xm Ys", direction badge, Sold badge if contactId has a Closed Won opp
+> - Clicking a call loads recording via `/api/recording?messageId=&locationId=` and transcript via `/api/transcription?messageId=&locationId=`
+> - Show "Loading recording..." and "Loading transcript..." states while fetching
+>
+> All requests use `Authorization: Bearer {locationKey}` and `Version: 2021-07-28` headers.
+>
+> Do not change leaderboard, metrics, client leaderboard, or config endpoints.
