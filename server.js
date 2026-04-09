@@ -144,9 +144,8 @@ app.get('/api/locations/:locationId/opportunities', async (req, res) => {
 });
 
 // ─── GET /api/locations/:locationId/calls ────────────────────────────────────
-// Searches all conversations sorted by recency, pre-filters to those whose
-// lastMessageType === 'TYPE_CALL', fetches their messages in batches of 10,
-// and returns structured call objects with messageId + meta fields.
+// Fetches conversations where lastMessageType=TYPE_CALL, then fetches messages
+// for each to extract the TYPE_CALL message and its meta fields.
 app.get('/api/locations/:locationId/calls', async (req, res) => {
   try {
     const { locationId } = req.params;
@@ -160,11 +159,11 @@ app.get('/api/locations/:locationId/calls', async (req, res) => {
       Version: '2021-07-28',
     };
 
-    // Step 1: paginate conversations, sorted by recency (cap at 10 pages = 1000 convos)
+    // Step 1: paginate conversations filtered to lastMessageType=TYPE_CALL
     const allConvs = [];
     let page = 1;
     while (true) {
-      const url = `${GHL_API}/conversations/search?locationId=${locationId}&limit=100&sortBy=last_message_date&sortOrder=desc&page=${page}`;
+      const url = `${GHL_API}/conversations/search?locationId=${locationId}&lastMessageType=TYPE_CALL&limit=100&sortBy=last_message_date&sortOrder=desc&page=${page}`;
       const data = await ghlGet(url, callHeaders);
       const convs = data.conversations || [];
       allConvs.push(...convs);
@@ -174,17 +173,10 @@ app.get('/api/locations/:locationId/calls', async (req, res) => {
       if (!hasMore || page > 10) break;
     }
 
-    // Step 2: pre-filter to conversations whose lastMessageType indicates a call
-    const callConvs = allConvs.filter(c =>
-      c.lastMessageType === 'TYPE_CALL' ||
-      c.lastMessageType === 'TYPE_PHONE_CALL' ||
-      c.lastMessageType === 'TYPE_PHONE'
-    );
-
-    // Step 3: fetch messages for each filtered conversation in batches of 10
+    // Step 2: fetch messages for each conversation in batches of 10
     const callObjects = [];
-    for (let i = 0; i < callConvs.length; i += 10) {
-      const batch = callConvs.slice(i, i + 10);
+    for (let i = 0; i < allConvs.length; i += 10) {
+      const batch = allConvs.slice(i, i + 10);
       const batchResults = await Promise.all(batch.map(async conv => {
         try {
           const msgRes = await fetch(`${GHL_API}/conversations/${conv.id}/messages`, { headers: callHeaders });
@@ -205,16 +197,16 @@ app.get('/api/locations/:locationId/calls', async (req, res) => {
             phone: conv.phone || conv.contactPhone || null,
             direction: (callMsg.direction || conv.lastMessageDirection || '').toLowerCase(),
             dateAdded: callMsg.dateAdded || callMsg.createdAt || conv.lastMessageDate || null,
-            callDuration: callMsg.meta?.callDuration || 0,
-            callStatus: callMsg.meta?.callStatus || null,
+            duration: callMsg.meta?.callDuration || 0,
+            status: callMsg.meta?.callStatus || null,
+            locationId,
           };
         } catch (_) {
           return null;
         }
       }));
       batchResults.forEach(c => { if (c) callObjects.push(c); });
-      // Brief pause between batches to respect rate limits
-      if (i + 10 < callConvs.length) await new Promise(r => setTimeout(r, 300));
+      if (i + 10 < allConvs.length) await new Promise(r => setTimeout(r, 300));
     }
 
     res.json({ calls: callObjects, total: callObjects.length });
@@ -225,64 +217,51 @@ app.get('/api/locations/:locationId/calls', async (req, res) => {
 });
 
 // ─── GET /api/debug/calls/:locationId ────────────────────────────────────────
-// Returns raw GHL conversations response for debugging field/type mapping.
+// Tests lastMessageType=TYPE_CALL filter and compares to unfiltered results.
 app.get('/api/debug/calls/:locationId', async (req, res) => {
   try {
     const { locationId } = req.params;
     const clientsData = await loadClientsConfig();
     const client = findClient(clientsData.clients, locationId);
     const apiKey = resolveLocationKey(client);
-    const headers = locationHeaders(apiKey);
 
-    // Try search with TYPE_PHONE_CALL
-    const searchPhoneCall = await fetch(
-      `${GHL_API}/conversations/search?locationId=${locationId}&type=TYPE_PHONE_CALL&limit=10`,
-      { headers }
-    ).then(r => r.json()).catch(e => ({ error: e.message }));
+    const callHeaders = {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      Version: '2021-07-28',
+    };
 
-    // Try search with TYPE_PHONE
-    const searchPhone = await fetch(
-      `${GHL_API}/conversations/search?locationId=${locationId}&type=TYPE_PHONE&limit=10`,
-      { headers }
-    ).then(r => r.json()).catch(e => ({ error: e.message }));
+    const tryFetch = async url =>
+      fetch(url, { headers: callHeaders }).then(r => r.json()).catch(e => ({ error: e.message }));
 
-    // Try search with no type filter
-    const searchNoType = await fetch(
-      `${GHL_API}/conversations/search?locationId=${locationId}&limit=10`,
-      { headers }
-    ).then(r => r.json()).catch(e => ({ error: e.message }));
+    const [lastMsgTypeCall, noFilter] = await Promise.all([
+      tryFetch(`${GHL_API}/conversations/search?locationId=${locationId}&lastMessageType=TYPE_CALL&limit=25&sortBy=last_message_date&sortOrder=desc`),
+      tryFetch(`${GHL_API}/conversations/search?locationId=${locationId}&limit=25&sortBy=last_message_date&sortOrder=desc`),
+    ]);
+
+    const summarise = (data) => {
+      const convs = data.conversations || [];
+      const types = {};
+      convs.forEach(c => { const k = c.lastMessageType || '?'; types[k] = (types[k] || 0) + 1; });
+      return {
+        status_from_meta: data.meta,
+        count: convs.length,
+        lastMessageTypes: types,
+        sample: convs.slice(0, 3).map(c => ({
+          id: c.id,
+          contactName: c.contactName || c.fullName,
+          lastMessageType: c.lastMessageType,
+          lastMessageDirection: c.lastMessageDirection,
+          lastMessageDate: c.lastMessageDate,
+        })),
+        error: data.error,
+      };
+    };
 
     res.json({
       locationId,
-      search_TYPE_PHONE_CALL: {
-        total: searchPhoneCall.meta?.total,
-        count: (searchPhoneCall.conversations || []).length,
-        sample: (searchPhoneCall.conversations || []).slice(0, 2).map(c => ({
-          id: c.id, type: c.type, lastMessageType: c.lastMessageType,
-          lastMessageDirection: c.lastMessageDirection, contactName: c.contactName || c.fullName,
-        })),
-        error: searchPhoneCall.error,
-      },
-      search_TYPE_PHONE: {
-        total: searchPhone.meta?.total,
-        count: (searchPhone.conversations || []).length,
-        lastMessageTypes: (() => {
-          const t = {}; (searchPhone.conversations||[]).forEach(c => { t[c.lastMessageType||'?'] = (t[c.lastMessageType||'?']||0)+1; }); return t;
-        })(),
-        sample: (searchPhone.conversations || []).slice(0, 2).map(c => ({
-          id: c.id, type: c.type, lastMessageType: c.lastMessageType,
-          lastMessageDirection: c.lastMessageDirection, contactName: c.contactName || c.fullName,
-        })),
-        error: searchPhone.error,
-      },
-      search_no_type_filter: {
-        total: searchNoType.meta?.total,
-        count: (searchNoType.conversations || []).length,
-        lastMessageTypes: (() => {
-          const t = {}; (searchNoType.conversations||[]).forEach(c => { t[c.lastMessageType||'?'] = (t[c.lastMessageType||'?']||0)+1; }); return t;
-        })(),
-        error: searchNoType.error,
-      },
+      lastMessageType_TYPE_CALL: summarise(lastMsgTypeCall),
+      no_filter_sample: summarise(noFilter),
     });
   } catch (err) {
     console.error('GET /api/debug/calls error:', err.message);

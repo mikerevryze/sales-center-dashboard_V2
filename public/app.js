@@ -111,7 +111,7 @@
     const d = (call.direction || '').toLowerCase();
     if (d === 'outbound' || d === 'outgoing') return 'outbound';
     if (d === 'inbound' || d === 'incoming') return 'inbound';
-    const missed = (call.callStatus || '').toLowerCase() === 'missed' || call.missed === true;
+    const missed = (call.status || '').toLowerCase() === 'missed' || call.missed === true;
     if (missed) return 'missed';
     return 'outbound';
   }
@@ -612,7 +612,7 @@
       const contactName = call.contactName || call.phone || 'Unknown';
       const dateStr = formatDate(call.dateAdded);
       const badge = callOutcomeBadge(call, contactOppMap);
-      const dur = call.callDuration || 0;
+      const dur = call.duration || 0;
       const durStr = dur > 0
         ? `${Math.floor(dur / 60)}m ${String(Math.floor(dur % 60)).padStart(2, '0')}s`
         : '—';
