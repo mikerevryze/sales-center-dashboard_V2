@@ -36,6 +36,7 @@
     config: { clients: [], reps: [] },
     opportunities: [],
     calls: [],
+    fetchedUsers: [],   // users fetched from GHL, keyed by locationId
   };
 
   const filters = {
@@ -242,6 +243,44 @@
         });
       });
 
+      // Bug 3: fetch users for each client to populate rep leaderboard
+      const userFetches = clients
+        .filter(c => c.locationId)
+        .map(client =>
+          apiFetch(`/api/locations/${client.locationId}/users`)
+            .then(d => ({
+              locationId: client.locationId,
+              clientName: client.name,
+              users: d.users || [],
+            }))
+            .catch(() => ({ locationId: client.locationId, clientName: client.name, users: [] }))
+        );
+
+      const userResults = await Promise.all(userFetches);
+      appData.fetchedUsers = [];
+      userResults.forEach(r => {
+        r.users.forEach(u => {
+          appData.fetchedUsers.push({
+            id: u.id,
+            name: u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim(),
+            email: u.email || '',
+            locationId: r.locationId,
+            clientName: r.clientName,
+          });
+        });
+      });
+
+      // Log all fetched users so IDs can be copied into reps-config.json
+      if (appData.fetchedUsers.length > 0) {
+        console.log('[Revryze] Fetched GHL users — copy IDs into reps-config.json:');
+        appData.fetchedUsers.forEach(u => {
+          console.log(`  [${u.clientName}] id: "${u.id}"  name: "${u.name}"  email: "${u.email}"`);
+        });
+        console.log('[Revryze] reps-config.json format:', JSON.stringify(
+          appData.fetchedUsers.map(u => ({ id: u.id, name: u.name, email: u.email })), null, 2
+        ));
+      }
+
       populateClientDropdown();
       renderAll();
     } catch (err) {
@@ -265,24 +304,48 @@
   }
 
   function populateLocationDropdown() {
-    $locationSelect.innerHTML = '<option value="all">All locations</option>';
+    // Always rebuild from fresh config data
+    const allClients = appData.config.clients || [];
+    const selectedClients = filters.clientId === 'all'
+      ? allClients
+      : allClients.filter(c => c.locationId === filters.clientId);
 
-    const clients = filters.clientId === 'all'
-      ? appData.config.clients
-      : appData.config.clients.filter(c => c.locationId === filters.clientId);
-
-    clients.forEach(client => {
-      client.pipelines.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p.pipelineId;
-        opt.textContent = filters.clientId === 'all'
-          ? `${client.name} — ${p.name}`
-          : p.name;
-        $locationSelect.appendChild(opt);
+    // Flatten all pipelines for the selected client(s)
+    const pipelines = [];
+    selectedClients.forEach(client => {
+      (client.pipelines || []).forEach(p => {
+        pipelines.push({
+          pipelineId: p.pipelineId,
+          label: filters.clientId === 'all' ? `${client.name} — ${p.name}` : p.name,
+        });
       });
     });
 
-    $locationSelect.value = filters.pipelineId !== 'all' ? filters.pipelineId : 'all';
+    // Rebuild options
+    $locationSelect.innerHTML = '';
+    const defaultOpt = document.createElement('option');
+    defaultOpt.value = 'all';
+    defaultOpt.textContent = 'All locations';
+    $locationSelect.appendChild(defaultOpt);
+
+    pipelines.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.pipelineId;
+      opt.textContent = p.label;
+      $locationSelect.appendChild(opt);
+    });
+
+    // Disable when no pipelines are available for selected client
+    $locationSelect.disabled = pipelines.length === 0;
+
+    // Restore selected value if still valid, otherwise reset
+    const validIds = pipelines.map(p => p.pipelineId);
+    if (filters.pipelineId !== 'all' && validIds.includes(filters.pipelineId)) {
+      $locationSelect.value = filters.pipelineId;
+    } else {
+      filters.pipelineId = 'all';
+      $locationSelect.value = 'all';
+    }
   }
 
   // ─── Render All ──────────────────────────────────────────────────────────────
@@ -306,7 +369,8 @@
       isAppointmentStage(o.pipelineStage || o.stageName || o.stage || '')
     ).length;
     const totalCalls = calls.length;
-    const rate = totalCalls > 0 ? ((sold / totalCalls) * 100).toFixed(1) : '0.0';
+    const rateDenom = totalCalls > 0 ? totalCalls : opps.length;
+    const rate = rateDenom > 0 ? ((sold / rateDenom) * 100).toFixed(1) : '0.0';
 
     $mSold.textContent = sold;
     $mRevenue.textContent = formatCurrency(revenue);
@@ -331,13 +395,16 @@
       isAppointmentStage(o.pipelineStage || o.stageName || o.stage || '')
     ).length;
     const totalCalls = repCalls.length;
-    const closeRate = totalCalls > 0 ? ((sold / totalCalls) * 100).toFixed(1) : '0.0';
+    const crDenom = totalCalls > 0 ? totalCalls : repOpps.length;
+    const closeRate = crDenom > 0 ? ((sold / crDenom) * 100).toFixed(1) : '0.0';
 
     return { sold, revenue, appointments: appts, calls: totalCalls, closeRate: parseFloat(closeRate) };
   }
 
   function renderRepLeaderboard(opps, calls) {
-    const { reps } = appData.config;
+    const configReps = appData.config.reps || [];
+    // Fall back to GHL-fetched users if no reps configured manually
+    const reps = configReps.length > 0 ? configReps : appData.fetchedUsers;
 
     if (!reps || reps.length === 0) {
       $repLbList.innerHTML = emptyState('Add reps to reps-config.json to populate the leaderboard');
@@ -422,7 +489,8 @@
         .filter(o => (o.status || '').toLowerCase() === 'won')
         .reduce((s, o) => s + parseFloat(o.monetaryValue || o.value || 0), 0);
       const totalCalls = clientCalls.length;
-      const closeRate = totalCalls > 0 ? parseFloat(((sold / totalCalls) * 100).toFixed(1)) : 0;
+      const closeRateDenom = totalCalls > 0 ? totalCalls : clientOpps.length;
+      const closeRate = closeRateDenom > 0 ? parseFloat(((sold / closeRateDenom) * 100).toFixed(1)) : 0;
       const repIds = new Set(clientCalls.map(c => c.assignedTo).filter(Boolean));
       const activeReps = reps ? reps.filter(r => repIds.has(r.id)).length : 0;
       return { client, sold, revenue, closeRate, activeReps, totalCalls };

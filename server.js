@@ -205,6 +205,24 @@ app.get('/api/conversations/:conversationId/messages', async (req, res) => {
   }
 });
 
+// ─── GET /api/locations/:locationId/users ────────────────────────────────────
+app.get('/api/locations/:locationId/users', async (req, res) => {
+  try {
+    const { locationId } = req.params;
+    const clientsData = await loadClientsConfig();
+    const client = findClient(clientsData.clients, locationId);
+    const apiKey = resolveLocationKey(client);
+    const data = await ghlGet(
+      `${GHL_API}/users/?locationId=${locationId}`,
+      locationHeaders(apiKey)
+    );
+    res.json(data);
+  } catch (err) {
+    console.error('GET /api/locations/:id/users error:', err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
 // ─── GET /api/recording ──────────────────────────────────────────────────────
 app.get('/api/recording', async (req, res) => {
   try {
