@@ -90,20 +90,20 @@ app.get('/api/config', async (req, res) => {
 });
 
 // ─── GET /api/setup/pipelines/:locationId ───────────────────────────────────
-// Dev helper: uses agency key to list pipelines for a location
+// Dev helper: uses location-specific key to list pipelines for a location
 app.get('/api/setup/pipelines/:locationId', async (req, res) => {
   try {
     const { locationId } = req.params;
+    const clientsData = await loadClientsConfig();
+    const client = findClient(clientsData.clients, locationId);
+    const apiKey = resolveLocationKey(client);
     const data = await ghlGet(
       `${GHL_API}/opportunities/pipelines?locationId=${locationId}`,
-      agencyHeaders()
+      locationHeaders(apiKey)
     );
     res.json(data);
   } catch (err) {
     console.error('GET /api/setup/pipelines error:', err.message);
-    if (err.status === 401) {
-      return res.json({ pipelines: [], note: 'Agency key not authorized for pipelines scope' });
-    }
     res.status(err.status || 500).json({ error: err.message });
   }
 });
