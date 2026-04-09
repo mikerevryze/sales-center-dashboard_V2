@@ -190,7 +190,7 @@
       const oppFetches = clients.flatMap(client =>
         client.pipelines.length > 0
           ? client.pipelines.map(p =>
-              apiFetch(`/api/locations/${client.locationId}/opportunities?pipelineId=${encodeURIComponent(p.pipelineId)}&startDate=${encodeURIComponent(startDate)}`)
+              apiFetch(`/api/locations/${client.locationId}/opportunities?pipelineId=${encodeURIComponent(p.pipelineId)}`)
                 .then(d => ({
                   clientId: client.locationId,
                   pipelineId: p.pipelineId,
@@ -200,7 +200,7 @@
                 .catch(err => ({ clientId: client.locationId, pipelineId: p.pipelineId, opportunities: [], error: err.message }))
             )
           : [
-              apiFetch(`/api/locations/${client.locationId}/opportunities?startDate=${encodeURIComponent(startDate)}`)
+              apiFetch(`/api/locations/${client.locationId}/opportunities`)
                 .then(d => ({
                   clientId: client.locationId,
                   pipelineId: null,

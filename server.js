@@ -118,10 +118,8 @@ app.get('/api/locations/:locationId/opportunities', async (req, res) => {
     const client = findClient(clientsData.clients, locationId);
     const apiKey = resolveLocationKey(client);
 
-    let url = `${GHL_API}/opportunities/search?locationId=${locationId}`;
-    if (pipelineId) url += `&pipelineId=${encodeURIComponent(pipelineId)}`;
-    if (startDate) url += `&startDate=${encodeURIComponent(startDate)}`;
-    if (endDate) url += `&endDate=${encodeURIComponent(endDate)}`;
+    let url = `${GHL_API}/opportunities/search?location_id=${locationId}`;
+    if (pipelineId) url += `&pipeline_id=${encodeURIComponent(pipelineId)}`;
 
     const allOpps = [];
     let page = 1;
@@ -156,8 +154,14 @@ app.get('/api/locations/:locationId/calls', async (req, res) => {
 
     let url = `${GHL_API}/conversations/search?locationId=${locationId}&type=TYPE_PHONE&limit=100`;
     if (userId) url += `&assignedTo=${encodeURIComponent(userId)}`;
-    if (startDate) url += `&startAfterDate=${encodeURIComponent(startDate)}`;
-    if (endDate) url += `&endBeforeDate=${encodeURIComponent(endDate)}`;
+    if (startDate) {
+      const ts = new Date(startDate).getTime();
+      if (!isNaN(ts)) url += `&startAfterDate=${ts}`;
+    }
+    if (endDate) {
+      const ts = new Date(endDate).getTime();
+      if (!isNaN(ts)) url += `&endBeforeDate=${ts}`;
+    }
 
     const allConvs = [];
     let page = 1;
