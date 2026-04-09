@@ -93,6 +93,14 @@
     return m + ':' + String(s).padStart(2, '0');
   }
 
+  function formatTalkTime(sec) {
+    if (!sec || isNaN(sec) || sec === 0) return '0m talk';
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    if (h > 0) return `${h}h ${m}m talk`;
+    return `${m}m talk`;
+  }
+
   function initials(name) {
     if (!name) return '?';
     return name.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
@@ -111,7 +119,7 @@
     const d = (call.direction || '').toLowerCase();
     if (d === 'outbound' || d === 'outgoing') return 'outbound';
     if (d === 'inbound' || d === 'incoming') return 'inbound';
-    const missed = (call.status || '').toLowerCase() === 'missed' || call.missed === true;
+    const missed = (call.status || '').toLowerCase() === 'no-answer' || call.missed === true;
     if (missed) return 'missed';
     return 'outbound';
   }
@@ -147,7 +155,7 @@
       }
       const d = parseDate(c.dateAdded);
       if (d && d < cutoff) return false;
-      if (filters.repId && c.assignedTo !== filters.repId) return false;
+      if (filters.repId && c.userId !== filters.repId) return false;
       return true;
     });
   }
@@ -392,12 +400,11 @@
   function computeRepStats(repId, opps, calls) {
     const repOpps = opps.filter(o =>
       (o.assignedTo === repId) ||
-      (o.contact && o.contact.id && calls.some(c => c.contactId === o.contact.id && c.assignedTo === repId))
+      (o.contact && o.contact.id && calls.some(c => c.contactId === o.contact.id && c.userId === repId))
     );
 
-    // Count calls assigned to this rep from the already-fetched location-level calls.
-    // The conversations API returns assignedTo on each conversation matching the rep's GHL user ID.
-    const repCalls = calls.filter(c => c.assignedTo === repId);
+    // Count calls where the call message's userId matches this rep
+    const repCalls = calls.filter(c => c.userId === repId);
 
     const sold = repOpps.filter(o => (o.status || '').toLowerCase() === 'won').length;
     const revenue = repOpps
@@ -407,10 +414,11 @@
       isAppointmentStage(o.pipelineStage || o.stageName || o.stage || '')
     ).length;
     const totalCalls = repCalls.length;
+    const totalDurationSec = repCalls.reduce((sum, c) => sum + (c.duration || 0), 0);
     const crDenom = totalCalls > 0 ? totalCalls : repOpps.length;
     const closeRate = crDenom > 0 ? ((sold / crDenom) * 100).toFixed(1) : '0.0';
 
-    return { sold, revenue, appointments: appts, calls: totalCalls, closeRate: parseFloat(closeRate) };
+    return { sold, revenue, appointments: appts, calls: totalCalls, totalDurationSec, closeRate: parseFloat(closeRate) };
   }
 
   function renderRepLeaderboard(opps, calls) {
@@ -451,7 +459,7 @@
           <div class="lb-avatar">${initials(rep.name)}</div>
           <div class="lb-info">
             <div class="lb-name">${escHtml(rep.name)}</div>
-            <div class="lb-sub">${s.calls} calls &middot; ${s.closeRate}% close</div>
+            <div class="lb-sub">${s.calls} calls &middot; ${formatTalkTime(s.totalDurationSec)}</div>
           </div>
           <div class="lb-stat">${statVal}</div>
         </div>`;

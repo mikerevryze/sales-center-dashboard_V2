@@ -185,7 +185,7 @@ app.get('/api/locations/:locationId/calls', async (req, res) => {
             : Array.isArray(msgData.items) ? msgData.items
             : Array.isArray(msgData) ? msgData : [];
 
-          const callMsg = messages.find(m => m.messageType === 'TYPE_CALL');
+          const callMsg = messages.find(m => m.type === 1 || m.messageType === 'TYPE_CALL');
           if (!callMsg) return null;
 
           return {
@@ -193,12 +193,12 @@ app.get('/api/locations/:locationId/calls', async (req, res) => {
             messageId: callMsg.id || callMsg.messageId || null,
             contactName: conv.contactName || conv.fullName || conv.phone || null,
             contactId: conv.contactId || null,
-            assignedTo: conv.assignedTo || null,
+            userId: callMsg.userId || conv.assignedTo || null,
             phone: conv.phone || conv.contactPhone || null,
             direction: (callMsg.direction || conv.lastMessageDirection || '').toLowerCase(),
             dateAdded: callMsg.dateAdded || callMsg.createdAt || conv.lastMessageDate || null,
-            duration: callMsg.meta?.callDuration || 0,
-            status: callMsg.meta?.callStatus || null,
+            duration: callMsg.meta?.call?.duration ?? callMsg.meta?.callDuration ?? 0,
+            status: callMsg.meta?.call?.status || callMsg.meta?.callStatus || callMsg.status || null,
             locationId,
           };
         } catch (_) {

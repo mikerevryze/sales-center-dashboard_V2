@@ -1,0 +1,39 @@
+Fix the calls system with the exact correct field paths confirmed from the GHL API response.
+The TYPE_CALL message structure is:
+json{
+  "id": "messageId",
+  "messageType": "TYPE_CALL",
+  "direction": "outbound",
+  "status": "completed",
+  "type": 1,
+  "userId": "repUserId",
+  "meta": {
+    "call": {
+      "duration": 3,
+      "status": "completed"
+    }
+  }
+}
+Update the calls endpoint /api/locations/:locationId/calls to:
+
+Search conversations with lastMessageType=TYPE_CALL
+For each conversation fetch messages and find the message where type === 1 OR messageType === 'TYPE_CALL'
+Extract duration from meta.call.duration (not meta.callDuration)
+Extract status from meta.call.status
+Extract userId from the call message's userId field — this is the rep who made the call
+Return: conversationId, messageId (the call message id), contactName, contactId, phone (from conversation's phone field), direction, dateAdded, duration (from meta.call.duration), status (from meta.call.status), userId, locationId
+
+Update the recording proxy /api/recording to use:
+GET https://services.leadconnectorhq.com/conversations/messages/{messageId}/locations/{locationId}/recording
+Accept messageId and locationId as query params. Use the location API key. Set response headers Content-Type: audio/x-wav and Accept-Ranges: bytes. Pipe the response directly.
+Update the transcription endpoint /api/transcription to use:
+GET https://services.leadconnectorhq.com/conversations/locations/{locationId}/messages/{messageId}/transcription
+Return the full response as-is.
+Update the frontend:
+
+Call rows show: contact name, date/time, duration formatted as "Xm Ys" from duration field, direction badge (outbound=blue, inbound=green, missed=red based on status === 'no-answer'), green "Sold" badge if contactId matches a Closed Won opportunity
+Clicking a call fetches recording via /api/recording?messageId={messageId}&locationId={locationId} and transcript via /api/transcription?messageId={messageId}&locationId={locationId}
+Rep call counts on leaderboard should now use userId from the call message to attribute calls to the correct rep
+Duration on leaderboard sub-line shows total talk time summed from all call durations for that rep formatted as "Xh Ym" or "Ym" if under an hour
+
+Do not change leaderboard ranking, metrics cards, client leaderboard, or config.
