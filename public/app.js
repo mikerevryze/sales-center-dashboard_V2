@@ -87,7 +87,7 @@
   }
 
   function formatDuration(sec) {
-    if (!sec || isNaN(sec)) return '—';
+    if (!sec || isNaN(sec) || !isFinite(sec)) return '—';
     const m = Math.floor(sec / 60);
     const s = Math.floor(sec % 60);
     return m + ':' + String(s).padStart(2, '0');
@@ -707,10 +707,10 @@
     // Load transcript
     if (messageId) {
       try {
-        const transcriptUrl = `/api/transcription?messageId=${encodeURIComponent(messageId)}&locationId=${encodeURIComponent(clientId)}`;
-        console.log(`[openCallDetail] fetching transcript: ${transcriptUrl}`);
-        const tData = await apiFetch(transcriptUrl);
-        console.log(`[openCallDetail] transcript response:`, tData);
+        console.log('[transcript] fetching for messageId:', messageId, 'locationId:', clientId);
+        const tRes = await fetch(`/api/transcription?messageId=${messageId}&locationId=${clientId}`);
+        const tData = await tRes.json();
+        console.log('[transcript] raw response:', JSON.stringify(tData));
         let text = null;
         if (Array.isArray(tData) && tData.length > 0) {
           text = tData.map(s => s.transcript).filter(Boolean).join(' ');
@@ -721,7 +721,7 @@
         }
         $transcriptText.textContent = text || 'No transcript available';
       } catch (err) {
-        console.error(`[openCallDetail] transcript fetch failed:`, err);
+        console.error('[transcript] fetch failed:', err);
         $transcriptText.textContent = 'No transcript available';
       }
     } else {
@@ -756,12 +756,15 @@
     }
   });
 
-  $audioEl.addEventListener('timeupdate', () => {
-    if (!$audioEl.duration || isNaN($audioEl.duration)) return;
+  function updateAudioProgress() {
+    if (!$audioEl.duration || isNaN($audioEl.duration) || !isFinite($audioEl.duration)) return;
     const pct = ($audioEl.currentTime / $audioEl.duration) * 100;
     $progressFill.style.width = pct + '%';
     $timeLabel.textContent = formatDuration($audioEl.currentTime) + ' / ' + formatDuration($audioEl.duration);
-  });
+  }
+
+  $audioEl.addEventListener('timeupdate', updateAudioProgress);
+  $audioEl.addEventListener('loadedmetadata', updateAudioProgress);
 
   $audioEl.addEventListener('ended', () => {
     $playBtn.innerHTML = '&#9654;';
