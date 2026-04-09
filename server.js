@@ -255,6 +255,34 @@ app.get('/api/debug/calls/:locationId', async (req, res) => {
   }
 });
 
+// ─── GET /api/debug/messages/:conversationId ─────────────────────────────────
+// Returns raw GHL messages response with no modification, for debugging field shape.
+app.get('/api/debug/messages/:conversationId', async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const { locationId } = req.query;
+    if (!locationId) return res.status(400).json({ error: 'locationId query param required' });
+    const clientsData = await loadClientsConfig();
+    const client = findClient(clientsData.clients, locationId);
+    const apiKey = resolveLocationKey(client);
+    const rawRes = await fetch(
+      `${GHL_API}/conversations/${conversationId}/messages`,
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          Version: '2021-07-28',
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+    const data = await rawRes.json();
+    res.json(data);
+  } catch (err) {
+    console.error('GET /api/debug/messages error:', err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
 // ─── GET /api/conversations/:conversationId/messages ─────────────────────────
 app.get('/api/conversations/:conversationId/messages', async (req, res) => {
   try {
