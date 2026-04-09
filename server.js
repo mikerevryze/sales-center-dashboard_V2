@@ -223,6 +223,56 @@ app.get('/api/locations/:locationId/users', async (req, res) => {
   }
 });
 
+// ─── GET /api/all-users ───────────────────────────────────────────────────────
+// Returns deduplicated users across all configured clients (deduped by email).
+// Use this to identify user IDs to add to reps-config.json.
+app.get('/api/all-users', async (req, res) => {
+  try {
+    const clientsData = await loadClientsConfig();
+    const clients = (clientsData.clients || []).filter(c => c.locationId);
+
+    const userFetches = clients.map(async client => {
+      try {
+        const apiKey = resolveLocationKey(client);
+        const data = await ghlGet(
+          `${GHL_API}/users/?locationId=${client.locationId}`,
+          locationHeaders(apiKey)
+        );
+        return (data.users || []).map(u => ({
+          id: u.id,
+          name: u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim(),
+          email: u.email || '',
+          phone: u.phone || '',
+          locationId: client.locationId,
+          clientName: client.name,
+        }));
+      } catch {
+        return [];
+      }
+    });
+
+    const results = await Promise.all(userFetches);
+    const allUsers = results.flat();
+
+    // Deduplicate by email (keep first occurrence; merge location list)
+    const seenEmails = new Map();
+    allUsers.forEach(u => {
+      const key = (u.email || u.id).toLowerCase();
+      if (seenEmails.has(key)) {
+        seenEmails.get(key).locations.push(u.clientName);
+      } else {
+        seenEmails.set(key, { ...u, locations: [u.clientName] });
+      }
+    });
+
+    const dedupedUsers = Array.from(seenEmails.values());
+    res.json({ users: dedupedUsers, total: dedupedUsers.length });
+  } catch (err) {
+    console.error('GET /api/all-users error:', err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
 // ─── GET /api/recording ──────────────────────────────────────────────────────
 app.get('/api/recording', async (req, res) => {
   try {

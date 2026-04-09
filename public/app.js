@@ -402,12 +402,10 @@
   }
 
   function renderRepLeaderboard(opps, calls) {
-    const configReps = appData.config.reps || [];
-    // Fall back to GHL-fetched users if no reps configured manually
-    const reps = configReps.length > 0 ? configReps : appData.fetchedUsers;
+    const reps = appData.config.reps || [];
 
-    if (!reps || reps.length === 0) {
-      $repLbList.innerHTML = emptyState('Add reps to reps-config.json to populate the leaderboard');
+    if (reps.length === 0) {
+      $repLbList.innerHTML = emptyState('Add your closers to reps-config.json to populate the leaderboard');
       return;
     }
 
