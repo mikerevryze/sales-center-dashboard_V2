@@ -18,7 +18,7 @@ function ghlHeaders(extraHeaders = {}) {
   return {
     Authorization: `Bearer ${API_KEY}`,
     'Content-Type': 'application/json',
-    Version: '2021-07-28',
+    Version: '2021-04-15',
     ...extraHeaders,
   };
 }
@@ -40,9 +40,7 @@ async function ghlFetch(url, opts = {}) {
 // ─── Locations (sub-accounts) ───────────────────────────────────────────────
 app.get('/api/locations', async (req, res) => {
   try {
-    const data = await ghlFetch(`${GHL_API}/locations/search`, {
-      headers: { Version: '2021-07-28' },
-    });
+    const data = await ghlFetch(`${GHL_API}/locations/search`, {});
     res.json(data);
   } catch (err) {
     console.error('GET /api/locations error:', err.message);
@@ -55,7 +53,7 @@ app.get('/api/locations/:locationId/users', async (req, res) => {
   try {
     const { locationId } = req.params;
     const data = await ghlFetch(`${GHL_API}/users/search`, {
-      headers: { Version: '2021-07-28', 'channel-Id': locationId },
+      headers: { 'channel-Id': locationId },
     });
     res.json(data);
   } catch (err) {
@@ -70,11 +68,14 @@ app.get('/api/locations/:locationId/pipelines', async (req, res) => {
     const { locationId } = req.params;
     const data = await ghlFetch(
       `${GHL_API}/opportunities/pipelines?locationId=${locationId}`,
-      { headers: { Version: '2021-07-28' } }
+      {}
     );
     res.json(data);
   } catch (err) {
     console.error('GET /api/locations/:id/pipelines error:', err.message);
+    if (err.status === 401) {
+      return res.json({ pipelines: [] });
+    }
     res.status(err.status || 500).json({ error: err.message });
   }
 });
@@ -87,9 +88,7 @@ app.get('/api/locations/:locationId/calls', async (req, res) => {
     let url = `${GHL_API}/conversations/search?locationId=${locationId}&type=TYPE_PHONE`;
     if (userId) url += `&assignedTo=${userId}`;
     if (startDate) url += `&startAfterDate=${encodeURIComponent(startDate)}`;
-    const data = await ghlFetch(url, {
-      headers: { Version: '2021-07-28' },
-    });
+    const data = await ghlFetch(url, {});
     res.json(data);
   } catch (err) {
     console.error('GET /api/locations/:id/calls error:', err.message);
@@ -103,7 +102,7 @@ app.get('/api/conversations/:conversationId/messages', async (req, res) => {
     const { conversationId } = req.params;
     const data = await ghlFetch(
       `${GHL_API}/conversations/${conversationId}/messages`,
-      { headers: { Version: '2021-07-28' } }
+      {}
     );
     res.json(data);
   } catch (err) {
@@ -137,12 +136,13 @@ app.get('/api/locations/:locationId/opportunities', async (req, res) => {
     const { pipelineId } = req.query;
     let url = `${GHL_API}/opportunities/search?locationId=${locationId}`;
     if (pipelineId) url += `&pipelineId=${pipelineId}`;
-    const data = await ghlFetch(url, {
-      headers: { Version: '2021-07-28' },
-    });
+    const data = await ghlFetch(url, {});
     res.json(data);
   } catch (err) {
     console.error('GET /api/locations/:id/opportunities error:', err.message);
+    if (err.status === 401) {
+      return res.json({ opportunities: [] });
+    }
     res.status(err.status || 500).json({ error: err.message });
   }
 });
