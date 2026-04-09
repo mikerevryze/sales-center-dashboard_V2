@@ -16,7 +16,12 @@
       "locationId": "9oW28j2SxdPAmUhO5MDI",
       "name": "STRONG Pilates — Momentic",
       "apiKeyEnvVar": "GHL_KEY_STRONG_PILATES",
-      "pipelines": []
+      "pipelines": [
+        { "pipelineId": "udyl3lJvKs31tt6O01SZ", "name": "Highland Village" },
+        { "pipelineId": "DEs336XJX4T8J1orIqYm", "name": "Lakeview" },
+        { "pipelineId": "Kz0hjzNRc8312nZQMOMw", "name": "Santa Monica" },
+        { "pipelineId": "acDfCLF5rfk6FO9Wwns5", "name": "West Lake" }
+      ]
     }
   ]
 }
