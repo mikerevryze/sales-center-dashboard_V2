@@ -147,40 +147,110 @@ app.get('/api/locations/:locationId/opportunities', async (req, res) => {
 app.get('/api/locations/:locationId/calls', async (req, res) => {
   try {
     const { locationId } = req.params;
-    const { userId, startDate, endDate } = req.query;
+    const { userId } = req.query;
     const clientsData = await loadClientsConfig();
     const client = findClient(clientsData.clients, locationId);
     const apiKey = resolveLocationKey(client);
 
-    let url = `${GHL_API}/conversations/search?locationId=${locationId}&type=TYPE_PHONE&limit=100`;
-    if (userId) url += `&assignedTo=${encodeURIComponent(userId)}`;
-    if (startDate) {
-      const ts = new Date(startDate).getTime();
-      if (!isNaN(ts)) url += `&startAfterDate=${ts}`;
-    }
-    if (endDate) {
-      const ts = new Date(endDate).getTime();
-      if (!isNaN(ts)) url += `&endBeforeDate=${ts}`;
+    // Use /conversations/search — the only working GHL endpoint for this.
+    // Try TYPE_PHONE_CALL first; fall back to TYPE_PHONE if empty.
+    const buildSearchUrl = (type) => {
+      let url = `${GHL_API}/conversations/search?locationId=${locationId}&limit=100&type=${type}`;
+      if (userId) url += `&assignedTo=${encodeURIComponent(userId)}`;
+      return url;
+    };
+
+    const fetchPages = async (baseUrl) => {
+      const allConvs = [];
+      let page = 1;
+      let hasMore = true;
+      while (hasMore) {
+        const data = await ghlGet(baseUrl + `&page=${page}`, locationHeaders(apiKey));
+        const convs = data.conversations || [];
+        allConvs.push(...convs);
+        const meta = data.meta || {};
+        hasMore = convs.length === 100 && (meta.total ? allConvs.length < meta.total : true);
+        page++;
+        if (page > 20) break;
+      }
+      return allConvs;
+    };
+
+    // Try TYPE_PHONE_CALL first, fall back to TYPE_PHONE
+    let conversations = await fetchPages(buildSearchUrl('TYPE_PHONE_CALL'));
+    if (conversations.length === 0) {
+      conversations = await fetchPages(buildSearchUrl('TYPE_PHONE'));
     }
 
-    const allConvs = [];
-    let page = 1;
-    let hasMore = true;
-
-    while (hasMore) {
-      const pageUrl = url + `&page=${page}`;
-      const data = await ghlGet(pageUrl, locationHeaders(apiKey));
-      const convs = data.conversations || [];
-      allConvs.push(...convs);
-      const meta = data.meta || {};
-      hasMore = convs.length === 100 && (meta.total ? allConvs.length < meta.total : true);
-      page++;
-      if (page > 20) break;
-    }
-
-    res.json({ conversations: allConvs, total: allConvs.length });
+    res.json({ conversations, total: conversations.length });
   } catch (err) {
     console.error('GET /api/locations/:id/calls error:', err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/debug/calls/:locationId ────────────────────────────────────────
+// Returns raw GHL conversations response for debugging field/type mapping.
+app.get('/api/debug/calls/:locationId', async (req, res) => {
+  try {
+    const { locationId } = req.params;
+    const clientsData = await loadClientsConfig();
+    const client = findClient(clientsData.clients, locationId);
+    const apiKey = resolveLocationKey(client);
+    const headers = locationHeaders(apiKey);
+
+    // Try search with TYPE_PHONE_CALL
+    const searchPhoneCall = await fetch(
+      `${GHL_API}/conversations/search?locationId=${locationId}&type=TYPE_PHONE_CALL&limit=10`,
+      { headers }
+    ).then(r => r.json()).catch(e => ({ error: e.message }));
+
+    // Try search with TYPE_PHONE
+    const searchPhone = await fetch(
+      `${GHL_API}/conversations/search?locationId=${locationId}&type=TYPE_PHONE&limit=10`,
+      { headers }
+    ).then(r => r.json()).catch(e => ({ error: e.message }));
+
+    // Try search with no type filter
+    const searchNoType = await fetch(
+      `${GHL_API}/conversations/search?locationId=${locationId}&limit=10`,
+      { headers }
+    ).then(r => r.json()).catch(e => ({ error: e.message }));
+
+    res.json({
+      locationId,
+      search_TYPE_PHONE_CALL: {
+        total: searchPhoneCall.meta?.total,
+        count: (searchPhoneCall.conversations || []).length,
+        sample: (searchPhoneCall.conversations || []).slice(0, 2).map(c => ({
+          id: c.id, type: c.type, lastMessageType: c.lastMessageType,
+          lastMessageDirection: c.lastMessageDirection, contactName: c.contactName || c.fullName,
+        })),
+        error: searchPhoneCall.error,
+      },
+      search_TYPE_PHONE: {
+        total: searchPhone.meta?.total,
+        count: (searchPhone.conversations || []).length,
+        lastMessageTypes: (() => {
+          const t = {}; (searchPhone.conversations||[]).forEach(c => { t[c.lastMessageType||'?'] = (t[c.lastMessageType||'?']||0)+1; }); return t;
+        })(),
+        sample: (searchPhone.conversations || []).slice(0, 2).map(c => ({
+          id: c.id, type: c.type, lastMessageType: c.lastMessageType,
+          lastMessageDirection: c.lastMessageDirection, contactName: c.contactName || c.fullName,
+        })),
+        error: searchPhone.error,
+      },
+      search_no_type_filter: {
+        total: searchNoType.meta?.total,
+        count: (searchNoType.conversations || []).length,
+        lastMessageTypes: (() => {
+          const t = {}; (searchNoType.conversations||[]).forEach(c => { t[c.lastMessageType||'?'] = (t[c.lastMessageType||'?']||0)+1; }); return t;
+        })(),
+        error: searchNoType.error,
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/debug/calls error:', err.message);
     res.status(err.status || 500).json({ error: err.message });
   }
 });

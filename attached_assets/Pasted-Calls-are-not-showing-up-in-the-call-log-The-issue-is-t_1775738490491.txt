@@ -1,0 +1,23 @@
+Calls are not showing up in the call log. The issue is the conversations endpoint is not returning call data. Fix it as follows:
+In server.js, update the /api/locations/:locationId/calls endpoint to use the correct GHL v2 conversations API with the proper filter for phone calls. Use this exact endpoint format:
+https://services.leadconnectorhq.com/conversations/?locationId={locationId}&type=TYPE_PHONE_CALL&limit=100
+Also try fetching from:
+https://services.leadconnectorhq.com/conversations/?locationId={locationId}&limit=100
+without the type filter as a fallback, since some GHL accounts use different type labels.
+Add a GET /api/debug/calls/:locationId endpoint that returns the raw response from GHL conversations API for that location so we can see exactly what fields and types are coming back. Use the location-specific API key.
+Also check that the Authorization header is using Bearer token correctly for the v2 services.leadconnectorhq.com endpoints — some v2 endpoints require a Version: 2021-07-28 header as well. Make sure that header is included on all v2 API calls.
+Do not change anything else.
+
+
+Then hit this URL and paste back what you see:
+https://12f1648a-4c4c-4ae2-825d-66ce131c2cde-00-2n8i8hy28xihs.spock.replit.dev/api/debug/calls/9oW28j2SxdPAmUhO5MDI
+That'll show us exactly what GHL is returning so we can map it correctly to the call log.and this will give us the recording and transcript?8:41 AMYes — once calls are showing, recordings and transcripts come from the same conversation. When you click a call it hits /api/conversations/:conversationId/messages which returns the call message object. That object contains:
+
+meta.recordingUrl → the audio file, proxied through /api/recording so it plays inline
+meta.transcriptionText → the transcript text displayed in the transcript box
+
+Both are already built into the app — they just have no calls to attach to yet since the call log is empty.
+One caveat worth knowing now: LC Phone transcripts only exist if you have AI Conversation Summary or Call Transcription enabled on that sub-account in GHL.
+Go check: inside the Strong Pilates sub-account → Settings → Phone Numbers → click the number → make sure "Call Recording" is on and "Transcription" is enabled.
+If transcription is off, recordings will still play but the transcript box will show "No transcript available." If it's on, both will work as soon as calls are loading.
+Go ahead and run that debug URL after the Agent finishes and paste back what comes through — that's the last thing standing between you and a fully working dashboard.
