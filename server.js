@@ -230,15 +230,23 @@ app.get('/api/conversations/:conversationId/messages', async (req, res) => {
       : Array.isArray(msgData.items) ? msgData.items
       : Array.isArray(msgData) ? msgData : [];
 
-    const callMsg = messages.find(m => m.type === 1 || m.messageType === 'TYPE_CALL');
-    if (!callMsg) return res.json({ messageId: null, duration: null, status: null });
+    console.log(`[conv-messages] convId=${conversationId} total messages=${messages.length}`);
+    console.log(`[conv-messages] message types:`, messages.map(m => ({ id: m.id, type: m.type, messageType: m.messageType })));
 
-    res.json({
-      messageId: callMsg.id || callMsg.messageId || null,
-      duration: callMsg.meta?.call?.duration ?? callMsg.meta?.callDuration ?? null,
-      status: callMsg.meta?.call?.status || callMsg.meta?.callStatus || callMsg.status || null,
-      userId: callMsg.userId || null,
-    });
+    const callMsg = messages.find(m => m.type === 1 || m.messageType === 'TYPE_CALL');
+    if (!callMsg) {
+      console.log(`[conv-messages] No TYPE_CALL message found for convId=${conversationId}`);
+      return res.json({ messageId: null, duration: null, status: null });
+    }
+
+    const messageId = callMsg.id || callMsg.messageId || null;
+    const duration = callMsg.meta?.call?.duration ?? callMsg.meta?.callDuration ?? null;
+    const status = callMsg.meta?.call?.status || callMsg.meta?.callStatus || callMsg.status || null;
+
+    console.log(`[conv-messages] Found call message: id=${callMsg.id} messageId=${callMsg.messageId} => messageId=${messageId} duration=${duration} status=${status}`);
+    console.log(`[conv-messages] callMsg.meta:`, JSON.stringify(callMsg.meta));
+
+    res.json({ messageId, duration, status, userId: callMsg.userId || null });
   } catch (err) {
     console.error('GET /api/conversations/:id/messages error:', err.message);
     res.status(500).json({ error: err.message });
@@ -598,6 +606,41 @@ app.get('/api/transcription', async (req, res) => {
   } catch (err) {
     console.error('GET /api/transcription error:', err.message);
     res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/debug/recording ────────────────────────────────────────────────
+// Returns { status, contentType, url } without piping audio — for verifying
+// that the GHL recording endpoint is reachable and returning the right type.
+app.get('/api/debug/recording', async (req, res) => {
+  try {
+    const { messageId, locationId } = req.query;
+    if (!messageId) return res.status(400).json({ error: 'messageId query param required' });
+    if (!locationId) return res.status(400).json({ error: 'locationId query param required' });
+
+    const clientsData = await loadClientsConfig();
+    const client = findClient(clientsData.clients, locationId);
+    const apiKey = resolveLocationKey(client);
+
+    const callHeaders = {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      Version: '2021-07-28',
+    };
+
+    const url = `${GHL_API}/conversations/messages/${messageId}/locations/${locationId}/recording`;
+    console.log(`[debug/recording] fetching: ${url}`);
+
+    const audioRes = await fetch(url, { headers: callHeaders });
+    const contentType = audioRes.headers.get('content-type') || null;
+    const contentLength = audioRes.headers.get('content-length') || null;
+
+    console.log(`[debug/recording] status=${audioRes.status} contentType=${contentType}`);
+
+    res.json({ status: audioRes.status, contentType, contentLength, url });
+  } catch (err) {
+    console.error('GET /api/debug/recording error:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 

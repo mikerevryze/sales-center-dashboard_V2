@@ -660,15 +660,19 @@
       ${clientName ? `<span>${escHtml(clientName)}</span>` : ''}
     `;
 
+    console.log(`[openCallDetail] convId=${convId} clientId=${clientId}`);
+
     // Fetch messages for this conversation to get messageId, duration, status
     // If already cached on the call object from a previous click, skip the fetch
     let messageId = (call && call.messageId) || null;
     if (!messageId) {
       try {
-        const msgInfo = await apiFetch(
-          `/api/conversations/${encodeURIComponent(convId)}/messages?locationId=${encodeURIComponent(clientId)}`
-        );
+        const fetchUrl = `/api/conversations/${encodeURIComponent(convId)}/messages?locationId=${encodeURIComponent(clientId)}`;
+        console.log(`[openCallDetail] fetching messages: ${fetchUrl}`);
+        const msgInfo = await apiFetch(fetchUrl);
+        console.log(`[openCallDetail] messages response:`, msgInfo);
         messageId = msgInfo.messageId || null;
+        console.log(`[openCallDetail] messageId resolved: ${messageId}`);
 
         // Update duration in the call row
         if (row) {
@@ -683,27 +687,35 @@
 
         // Cache messageId back onto the call object so repeat clicks skip re-fetch
         if (call && messageId) call.messageId = messageId;
-      } catch (_) {
-        // proceed without messageId
+      } catch (err) {
+        console.error(`[openCallDetail] failed to fetch messages:`, err);
       }
+    } else {
+      console.log(`[openCallDetail] using cached messageId: ${messageId}`);
     }
 
     // Load recording
     if (messageId) {
-      $audioEl.src = `/api/recording?messageId=${encodeURIComponent(messageId)}&locationId=${encodeURIComponent(clientId)}`;
+      const recUrl = `/api/recording?messageId=${encodeURIComponent(messageId)}&locationId=${encodeURIComponent(clientId)}`;
+      console.log(`[openCallDetail] setting audio src: ${recUrl}`);
+      $audioEl.src = recUrl;
       $audioEl.load();
+    } else {
+      console.warn(`[openCallDetail] no messageId — recording + transcript skipped`);
     }
 
     // Load transcript
     if (messageId) {
       try {
-        const tData = await apiFetch(
-          `/api/transcription?messageId=${encodeURIComponent(messageId)}&locationId=${encodeURIComponent(clientId)}`
-        );
+        const transcriptUrl = `/api/transcription?messageId=${encodeURIComponent(messageId)}&locationId=${encodeURIComponent(clientId)}`;
+        console.log(`[openCallDetail] fetching transcript: ${transcriptUrl}`);
+        const tData = await apiFetch(transcriptUrl);
+        console.log(`[openCallDetail] transcript response:`, tData);
         const text = tData.transcriptionText || tData.text || tData.transcript ||
           (typeof tData === 'string' ? tData : null);
         $transcriptText.textContent = text || 'No transcript available';
-      } catch (_) {
+      } catch (err) {
+        console.error(`[openCallDetail] transcript fetch failed:`, err);
         $transcriptText.textContent = 'No transcript available';
       }
     } else {
