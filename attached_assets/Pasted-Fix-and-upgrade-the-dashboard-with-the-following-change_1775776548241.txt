@@ -1,0 +1,39 @@
+Fix and upgrade the dashboard with the following changes:
+Fix 1 — Weekly SPIFF sold count is wrong:
+The memberships sold count for the week is pulling from all-time opportunity data instead of filtering by the selected week's date range. Fix the SPIFF leaderboard to filter opportunities by dateAdded or lastStageChangeAt falling within the selected Mon–Sun week range. The week boundaries should be Monday 00:00:00 to Sunday 23:59:59 in local time. Cross-reference closed won opportunities against the week date range before counting them per rep.
+Fix 2 — Remove duplicate transcript:
+In the call detail panel, when AI analysis has been run, only show the labeled transcript from the AI analysis result. Remove the plain transcript box entirely once AI analysis is loaded. Before analysis is run, show the plain transcript as before. After analysis loads, replace it completely with the labeled transcript — do not show both.
+Fix 3 — All call filters:
+Add a full filter bar to the Calls tab with these filters that can all be applied simultaneously:
+
+Rep — dropdown of all configured reps plus "All reps"
+Client/Location — client dropdown + pipeline dropdown
+Date range — Last 7 / 30 / 90 days + custom date picker (from/to)
+Direction — All / Inbound / Outbound / Missed
+Outcome — All / Sold / In Pipeline / No Answer — cross-references contactId against closed won opportunities
+Min call duration — dropdown: Any / 1+ min / 2+ min / 5+ min / 10+ min — filters using meta.call.duration in seconds
+Flagged for review — toggle that shows only calls flagged in call-notes.json
+AI Score — dropdown: Any / 7+ / 8+ / 9+ — filters using cached AI analysis scores stored in call-notes.json
+All filters are applied client-side against the loaded call data. Show an active filter count badge on the filter bar when any non-default filters are applied. Add a "Clear all filters" button.
+
+Fix 4 — Rep profile click-through:
+When a rep's name or avatar is clicked anywhere on the dashboard (leaderboard, call row, SPIFF), it opens a Rep Profile panel/modal showing:
+
+Rep name, avatar, total stats (sold, revenue, calls, talk time, close rate, avg AI score)
+Their full call history (all calls from all clients) in a scrollable list with the same call row format
+Their SMS conversation count
+Their top 3 AI scored calls with scores shown
+A "View all calls" button that switches to the Calls tab with that rep pre-filtered
+
+Fix 5 — SMS outcome detection:
+In the Conversations tab, cross-reference each conversation's contactId against the loaded opportunities data. If a contact has a Closed Won opportunity, show a green "Sold" badge on the SMS conversation row. Add the same Outcome filter to the Conversations tab (Sold / In Pipeline / No Answer).
+Fix 6 — Scoring rubric editor:
+Add a "Scoring Rubric" section accessible via a settings icon (gear ⚙) in the top right of the dashboard. It opens a panel showing the current AI scoring criteria as an editable text area. The rubric is stored in scoring-rubric.json with this default content:
+json{
+  "default": "You are a sales call analyst for Revryze, a franchise presale membership company. Score this call out of 10 based on: Opening (1pt) - did the rep introduce themselves clearly?, Discovery (2pts) - did they ask about the prospect's goals/situation?, Pitch (2pts) - did they clearly explain the founding membership value and urgency?, Objection Handling (2pts) - did they address concerns effectively?, Close Attempt (2pts) - did they ask for the sale or next step?, Professionalism (1pt) - tone, pace, listening. Return JSON with: speakerLabeledTranscript (array of {speaker, text}), summary, keyMoments (array of {label, detail}), score (number), scoreBreakdown (object with each category and points earned), coachingTip.",
+  "repOverrides": {}
+}
+The rubric editor shows the default rubric in a text area. Save button writes to scoring-rubric.json. The AI analysis endpoint reads from this file when building the prompt — using a rep-specific override if one exists in repOverrides[repId], otherwise using the default. Add a "Rep-specific override" section where you can select a rep and write a custom rubric for them.
+Fix 7 — Score caching:
+When a call is analyzed with AI, save the result to call-notes.json under that messageId so it persists across sessions and the score is available for filtering without re-analyzing. On call detail open, if a cached analysis exists load it automatically without needing to click "Analyze".
+Do not change the dark theme, existing working features, or backend GHL endpoints.

@@ -43,16 +43,63 @@
     </nav>
     <div class="header-right">
       <button id="refresh-btn" class="btn-refresh" title="Refresh data">
-        <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg>
+        <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg>
+      </button>
+      <button id="settings-btn" class="btn-refresh" title="Scoring rubric settings">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
       </button>
     </div>
   </header>
+
+  <!-- ─── Settings Panel ──────────────────────────────────────────────────── -->
+  <div id="settings-panel" class="settings-panel hidden">
+    <div class="settings-header">
+      <h3 class="settings-title">⚙ Scoring Rubric</h3>
+      <button id="settings-close" class="btn-icon">✕</button>
+    </div>
+    <div class="settings-body">
+      <div class="settings-section-label">Default Rubric</div>
+      <textarea id="rubric-default-text" class="rubric-textarea" rows="12" placeholder="Enter default scoring criteria…"></textarea>
+      <div class="settings-section-label" style="margin-top:16px">Rep-Specific Override</div>
+      <select id="rubric-rep-select" class="ctrl-select" style="width:100%;margin-bottom:8px">
+        <option value="">Select a rep…</option>
+      </select>
+      <textarea id="rubric-override-text" class="rubric-textarea" rows="8" placeholder="Leave blank to use default rubric for this rep…"></textarea>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button id="save-rubric-btn" class="btn-save-note" style="flex:1">Save Rubric</button>
+        <button id="save-rep-override-btn" class="btn-save-note" style="flex:1;background:#1f1f1f;color:var(--sub)">Save Rep Override</button>
+      </div>
+    </div>
+  </div>
+  <div id="settings-overlay" class="modal-overlay hidden"></div>
+
+  <!-- ─── Rep Profile Modal ───────────────────────────────────────────────── -->
+  <div id="rep-modal-overlay" class="modal-overlay hidden"></div>
+  <div id="rep-profile-modal" class="rep-profile-modal hidden">
+    <div class="rep-modal-header">
+      <button id="rep-modal-close" class="btn-icon">✕</button>
+    </div>
+    <div class="rep-modal-hero">
+      <div id="rep-modal-avatar" class="rep-modal-avatar">?</div>
+      <div>
+        <div id="rep-modal-name" class="rep-modal-name">Rep Name</div>
+        <div id="rep-modal-sub" class="rep-modal-sub"></div>
+      </div>
+    </div>
+    <div id="rep-modal-stats" class="rep-modal-stats"></div>
+    <div class="rep-modal-section-label">Top AI-Scored Calls</div>
+    <div id="rep-modal-top-calls" class="rep-modal-call-list"></div>
+    <div class="rep-modal-section-label" style="margin-top:12px">Recent Calls</div>
+    <div id="rep-modal-all-calls" class="rep-modal-call-list"></div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border)">
+      <button id="rep-modal-view-btn" class="btn-save-note" style="width:100%">View All Calls in Calls Tab →</button>
+    </div>
+  </div>
 
   <!-- ═══════════════════════════════════════════════════════════════════════ -->
   <!-- TAB 1: COMMAND CENTER                                                   -->
   <!-- ═══════════════════════════════════════════════════════════════════════ -->
   <section id="tab-command" class="tab-section active">
-
     <div class="filter-bar">
       <select id="cc-client-select" class="ctrl-select">
         <option value="all">All clients</option>
@@ -116,32 +163,69 @@
         <div id="client-lb-list" class="lb-list"></div>
       </div>
     </div>
-
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════════════ -->
   <!-- TAB 2: CALLS                                                            -->
   <!-- ═══════════════════════════════════════════════════════════════════════ -->
   <section id="tab-calls" class="tab-section hidden">
-
-    <div class="filter-bar">
-      <input id="calls-search" class="ctrl-input" type="text" placeholder="Search contact…" />
-      <select id="calls-rep-select" class="ctrl-select">
-        <option value="all">All reps</option>
-      </select>
-      <select id="calls-client-select" class="ctrl-select">
-        <option value="all">All clients</option>
-      </select>
-      <select id="calls-date-select" class="ctrl-select">
-        <option value="7">Last 7 days</option>
-        <option value="30" selected>Last 30 days</option>
-        <option value="90">Last 90 days</option>
-      </select>
-      <div class="dir-tabs" id="dir-tabs">
-        <button class="dtab active" data-dir="all">All</button>
-        <button class="dtab" data-dir="outbound">Outbound</button>
-        <button class="dtab" data-dir="inbound">Inbound</button>
-        <button class="dtab" data-dir="missed">Missed</button>
+    <div class="filter-bar calls-filter-bar">
+      <!-- Row 1 -->
+      <div class="filter-row">
+        <input id="calls-search" class="ctrl-input" type="text" placeholder="Search contact…" />
+        <select id="calls-rep-select" class="ctrl-select">
+          <option value="all">All reps</option>
+        </select>
+        <select id="calls-client-select" class="ctrl-select">
+          <option value="all">All clients</option>
+        </select>
+        <select id="calls-date-select" class="ctrl-select">
+          <option value="7">Last 7 days</option>
+          <option value="30" selected>Last 30 days</option>
+          <option value="90">Last 90 days</option>
+          <option value="custom">Custom range…</option>
+        </select>
+        <div id="custom-date-inputs" class="custom-date-inputs hidden">
+          <input id="calls-from-date" type="date" class="ctrl-input ctrl-date" />
+          <span style="color:var(--sub);font-size:12px">to</span>
+          <input id="calls-to-date" type="date" class="ctrl-input ctrl-date" />
+        </div>
+        <div class="filter-actions">
+          <span id="filter-count-badge" class="filter-badge hidden">0 active</span>
+          <button id="clear-filters-btn" class="btn-clear hidden">Clear all</button>
+        </div>
+      </div>
+      <!-- Row 2 -->
+      <div class="filter-row filter-row-2">
+        <div id="dir-tabs" class="dir-tabs">
+          <button class="dtab active" data-dir="all">All</button>
+          <button class="dtab" data-dir="outbound">Outbound</button>
+          <button class="dtab" data-dir="inbound">Inbound</button>
+          <button class="dtab" data-dir="missed">Missed</button>
+        </div>
+        <select id="calls-outcome-select" class="ctrl-select ctrl-sm">
+          <option value="all">All outcomes</option>
+          <option value="sold">Sold</option>
+          <option value="pipeline">In Pipeline</option>
+          <option value="noanswer">No Answer</option>
+        </select>
+        <select id="calls-min-duration-select" class="ctrl-select ctrl-sm">
+          <option value="0">Any duration</option>
+          <option value="60">1+ min</option>
+          <option value="120">2+ min</option>
+          <option value="300">5+ min</option>
+          <option value="600">10+ min</option>
+        </select>
+        <select id="calls-ai-score-select" class="ctrl-select ctrl-sm">
+          <option value="0">Any AI score</option>
+          <option value="7">7+ score</option>
+          <option value="8">8+ score</option>
+          <option value="9">9+ score</option>
+        </select>
+        <label class="flag-filter-label">
+          <input type="checkbox" id="calls-flagged-toggle" />
+          <span>🚩 Flagged only</span>
+        </label>
       </div>
     </div>
 
@@ -157,7 +241,7 @@
       <div class="panel call-detail-panel hidden" id="call-detail-panel">
         <div class="panel-header">
           <h2 class="panel-title">Call Detail</h2>
-          <button class="btn-icon" id="close-detail-btn" title="Close">&#x2715;</button>
+          <button class="btn-icon" id="close-detail-btn" title="Close">✕</button>
         </div>
         <div class="call-meta" id="call-meta"></div>
         <div class="audio-player">
@@ -168,7 +252,7 @@
           <span class="time-label" id="time-label">0:00 / 0:00</span>
           <audio id="audio-el"></audio>
         </div>
-        <div class="detail-section">
+        <div class="detail-section" id="transcript-section">
           <div class="detail-section-label">Transcript</div>
           <div class="transcript-text" id="transcript-text">No transcript available</div>
         </div>
@@ -191,18 +275,21 @@
         </div>
       </div>
     </div>
-
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════════════ -->
   <!-- TAB 3: CONVERSATIONS (SMS)                                              -->
   <!-- ═══════════════════════════════════════════════════════════════════════ -->
   <section id="tab-sms" class="tab-section hidden">
-
     <div class="filter-bar">
       <input id="sms-search" class="ctrl-input" type="text" placeholder="Search contact…" />
       <select id="sms-client-select" class="ctrl-select">
         <option value="all">All clients</option>
+      </select>
+      <select id="sms-outcome-select" class="ctrl-select">
+        <option value="all">All outcomes</option>
+        <option value="sold">Sold</option>
+        <option value="pipeline">In Pipeline</option>
       </select>
     </div>
 
@@ -218,19 +305,17 @@
       <div class="panel call-detail-panel hidden" id="sms-thread-panel">
         <div class="panel-header">
           <h2 class="panel-title" id="sms-thread-contact">Conversation</h2>
-          <button class="btn-icon" id="close-sms-btn" title="Close">&#x2715;</button>
+          <button class="btn-icon" id="close-sms-btn" title="Close">✕</button>
         </div>
         <div id="sms-thread-messages" class="sms-thread"></div>
       </div>
     </div>
-
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════════════ -->
   <!-- TAB 4: WEEKLY SPIFF                                                     -->
   <!-- ═══════════════════════════════════════════════════════════════════════ -->
   <section id="tab-spiff" class="tab-section hidden">
-
     <div class="filter-bar">
       <select id="spiff-week-select" class="ctrl-select">
         <option value="current">Current Week</option>
@@ -238,18 +323,17 @@
     </div>
 
     <div class="spiff-banner" id="spiff-banner">
-      <div class="spiff-banner-label">CURRENT SPIFF WEEK</div>
+      <div class="spiff-banner-label">SPIFF WEEK</div>
       <div class="spiff-banner-range" id="spiff-banner-range">—</div>
     </div>
 
     <div class="panel spiff-panel">
       <div class="panel-header">
         <h2 class="panel-title">Weekly Rankings</h2>
-        <span class="spiff-sub">Memberships sold this week</span>
+        <span class="spiff-sub">Memberships closed this week</span>
       </div>
       <div id="spiff-lb-list" class="lb-list spiff-lb"></div>
     </div>
-
   </section>
 
   <script src="app.js"></script>

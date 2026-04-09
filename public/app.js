@@ -7,7 +7,6 @@
   const $errorBanner      = document.getElementById('error-banner');
   const $refreshBtn       = document.getElementById('refresh-btn');
 
-  // Nav tabs
   const $navTabs          = document.querySelectorAll('.nav-tab');
   const $tabSections      = document.querySelectorAll('.tab-section');
 
@@ -26,44 +25,78 @@
   const $clientLbList     = document.getElementById('client-lb-list');
 
   // Calls tab
-  const $callsSearch      = document.getElementById('calls-search');
-  const $callsRepSelect   = document.getElementById('calls-rep-select');
-  const $callsClientSelect= document.getElementById('calls-client-select');
-  const $callsDateSelect  = document.getElementById('calls-date-select');
-  const $dirTabs          = document.getElementById('dir-tabs');
-  const $callLogTitle     = document.getElementById('call-log-title');
-  const $callLogCount     = document.getElementById('call-log-count');
-  const $callList         = document.getElementById('call-log-list');
-  const $callDetail       = document.getElementById('call-detail-panel');
-  const $callMeta         = document.getElementById('call-meta');
-  const $closeDetailBtn   = document.getElementById('close-detail-btn');
-  const $playBtn          = document.getElementById('play-btn');
-  const $progressWrap     = document.getElementById('progress-wrap');
-  const $progressFill     = document.getElementById('progress-fill');
-  const $timeLabel        = document.getElementById('time-label');
-  const $audioEl          = document.getElementById('audio-el');
-  const $transcriptText   = document.getElementById('transcript-text');
-  const $aiAnalyzeBtn     = document.getElementById('ai-analyze-btn');
-  const $aiResults        = document.getElementById('ai-results');
-  const $existingNote     = document.getElementById('existing-note');
-  const $managerNoteText  = document.getElementById('manager-note-text');
-  const $saveNoteBtn      = document.getElementById('save-note-btn');
-  const $flagToggle       = document.getElementById('flag-toggle');
+  const $callsSearch         = document.getElementById('calls-search');
+  const $callsRepSelect      = document.getElementById('calls-rep-select');
+  const $callsClientSelect   = document.getElementById('calls-client-select');
+  const $callsDateSelect     = document.getElementById('calls-date-select');
+  const $customDateInputs    = document.getElementById('custom-date-inputs');
+  const $callsFromDate       = document.getElementById('calls-from-date');
+  const $callsToDate         = document.getElementById('calls-to-date');
+  const $filterCountBadge    = document.getElementById('filter-count-badge');
+  const $clearFiltersBtn     = document.getElementById('clear-filters-btn');
+  const $dirTabs             = document.getElementById('dir-tabs');
+  const $callsOutcomeSelect  = document.getElementById('calls-outcome-select');
+  const $callsMinDurSelect   = document.getElementById('calls-min-duration-select');
+  const $callsAiScoreSelect  = document.getElementById('calls-ai-score-select');
+  const $callsFlaggedToggle  = document.getElementById('calls-flagged-toggle');
+  const $callLogTitle        = document.getElementById('call-log-title');
+  const $callLogCount        = document.getElementById('call-log-count');
+  const $callList            = document.getElementById('call-log-list');
+  const $callDetail          = document.getElementById('call-detail-panel');
+  const $callMeta            = document.getElementById('call-meta');
+  const $closeDetailBtn      = document.getElementById('close-detail-btn');
+  const $playBtn             = document.getElementById('play-btn');
+  const $progressWrap        = document.getElementById('progress-wrap');
+  const $progressFill        = document.getElementById('progress-fill');
+  const $timeLabel           = document.getElementById('time-label');
+  const $audioEl             = document.getElementById('audio-el');
+  const $transcriptSection   = document.getElementById('transcript-section');
+  const $transcriptText      = document.getElementById('transcript-text');
+  const $aiAnalyzeBtn        = document.getElementById('ai-analyze-btn');
+  const $aiResults           = document.getElementById('ai-results');
+  const $existingNote        = document.getElementById('existing-note');
+  const $managerNoteText     = document.getElementById('manager-note-text');
+  const $saveNoteBtn         = document.getElementById('save-note-btn');
+  const $flagToggle          = document.getElementById('flag-toggle');
 
   // SMS tab
-  const $smsSearch        = document.getElementById('sms-search');
-  const $smsClientSelect  = document.getElementById('sms-client-select');
-  const $smsList          = document.getElementById('sms-list');
-  const $smsCount         = document.getElementById('sms-count');
-  const $smsThreadPanel   = document.getElementById('sms-thread-panel');
-  const $smsThreadContact = document.getElementById('sms-thread-contact');
-  const $smsThreadMessages= document.getElementById('sms-thread-messages');
-  const $closeSmsBtn      = document.getElementById('close-sms-btn');
+  const $smsSearch           = document.getElementById('sms-search');
+  const $smsClientSelect     = document.getElementById('sms-client-select');
+  const $smsOutcomeSelect    = document.getElementById('sms-outcome-select');
+  const $smsList             = document.getElementById('sms-list');
+  const $smsCount            = document.getElementById('sms-count');
+  const $smsThreadPanel      = document.getElementById('sms-thread-panel');
+  const $smsThreadContact    = document.getElementById('sms-thread-contact');
+  const $smsThreadMessages   = document.getElementById('sms-thread-messages');
+  const $closeSmsBtn         = document.getElementById('close-sms-btn');
 
   // SPIFF tab
-  const $spiffWeekSelect  = document.getElementById('spiff-week-select');
-  const $spiffBannerRange = document.getElementById('spiff-banner-range');
-  const $spiffLbList      = document.getElementById('spiff-lb-list');
+  const $spiffWeekSelect     = document.getElementById('spiff-week-select');
+  const $spiffBannerRange    = document.getElementById('spiff-banner-range');
+  const $spiffLbList         = document.getElementById('spiff-lb-list');
+
+  // Settings
+  const $settingsBtn         = document.getElementById('settings-btn');
+  const $settingsPanel       = document.getElementById('settings-panel');
+  const $settingsOverlay     = document.getElementById('settings-overlay');
+  const $settingsClose       = document.getElementById('settings-close');
+  const $rubricDefaultText   = document.getElementById('rubric-default-text');
+  const $rubricRepSelect     = document.getElementById('rubric-rep-select');
+  const $rubricOverrideText  = document.getElementById('rubric-override-text');
+  const $saveRubricBtn       = document.getElementById('save-rubric-btn');
+  const $saveRepOverrideBtn  = document.getElementById('save-rep-override-btn');
+
+  // Rep profile modal
+  const $repModalOverlay     = document.getElementById('rep-modal-overlay');
+  const $repProfileModal     = document.getElementById('rep-profile-modal');
+  const $repModalClose       = document.getElementById('rep-modal-close');
+  const $repModalAvatar      = document.getElementById('rep-modal-avatar');
+  const $repModalName        = document.getElementById('rep-modal-name');
+  const $repModalSub         = document.getElementById('rep-modal-sub');
+  const $repModalStats       = document.getElementById('rep-modal-stats');
+  const $repModalTopCalls    = document.getElementById('rep-modal-top-calls');
+  const $repModalAllCalls    = document.getElementById('rep-modal-all-calls');
+  const $repModalViewBtn     = document.getElementById('rep-modal-view-btn');
 
   // ─── App State ──────────────────────────────────────────────────────────────
   const appData = {
@@ -71,23 +104,36 @@
     opportunities: [],
     calls: [],
     smsConvos: [],
-    fetchedUsers: [],
+    callNotes: {},
+    notesByConvId: {},
+    scoringRubric: { default: '', repOverrides: {} },
+    contactWonSet: new Set(),
+    allContactOppMap: {},
   };
 
-  const filters = {
-    clientId: 'all',
-    pipelineId: 'all',
-    days: 30,
+  const ccFilters = { clientId: 'all', pipelineId: 'all', days: 30 };
+  const callFilters = {
     repId: null,
-    callDir: 'all',
-    callSearch: '',
-    callsDays: 30,
+    clientId: 'all',
+    days: 30,
+    fromDate: null,
+    toDate: null,
+    dir: 'all',
+    search: '',
+    outcome: 'all',
+    minDuration: 0,
+    flaggedOnly: false,
+    minAiScore: 0,
   };
+  const smsFilters = { clientId: 'all', search: '', outcome: 'all' };
 
-  let currentCallConvId  = null;
-  let currentCallLocId   = null;
-  let currentMessageId   = null;
-  let activeTab          = 'command';
+  let currentCallConvId    = null;
+  let currentCallLocId     = null;
+  let currentMessageId     = null;
+  let currentCallRepId     = null;
+  let currentCallContactId = null;
+  let currentProfileRepId  = null;
+  let activeTab            = 'command';
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
   function showError(msg) {
@@ -98,573 +144,489 @@
 
   async function apiFetch(path, opts) {
     const res = await fetch(path, opts);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-    return data;
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      throw new Error(`${res.status} ${txt.slice(0, 120)}`);
+    }
+    return res.json();
   }
 
+  function fmt$(n) { return '$' + (n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 }); }
+  function fmtDur(sec) {
+    if (!sec || !isFinite(sec) || sec < 0) return '0:00';
+    const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  }
+  function fmtDurLong(sec) {
+    if (!sec || !isFinite(sec)) return '0m';
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
+    return h ? `${h}h ${m}m` : `${m}m`;
+  }
+  function parseDate(v) {
+    if (!v) return null;
+    const d = new Date(typeof v === 'number' ? v : v);
+    return isNaN(d) ? null : d;
+  }
+  function initials(name) {
+    if (!name) return '?';
+    const parts = name.trim().split(' ');
+    return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
+  }
   function getDateCutoff(days) {
     const d = new Date();
-    d.setDate(d.getDate() - (days || filters.days));
+    d.setDate(d.getDate() - (days || 30));
+    d.setHours(0, 0, 0, 0);
     return d;
   }
 
-  function parseDate(val) {
-    if (!val) return null;
-    return new Date(val);
-  }
-
-  function formatDate(val) {
-    const d = parseDate(val);
-    if (!d || isNaN(d)) return '';
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
-      ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  }
-
-  function formatCurrency(n) {
-    return '$' + Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
-  }
-
-  function formatDuration(sec) {
-    if (!sec || isNaN(sec) || !isFinite(sec)) return '—';
-    const m = Math.floor(sec / 60);
-    const s = Math.floor(sec % 60);
-    return m + ':' + String(s).padStart(2, '0');
-  }
-
-  function formatTalkTime(sec) {
-    if (!sec || isNaN(sec) || sec === 0) return '0m';
-    const h = Math.floor(sec / 3600);
-    const m = Math.floor((sec % 3600) / 60);
-    if (h > 0) return `${h}h ${m}m`;
-    return `${m}m`;
-  }
-
-  function formatTalkTimeFull(sec) {
-    if (!sec || isNaN(sec) || sec === 0) return '0m talk';
-    const h = Math.floor(sec / 3600);
-    const m = Math.floor((sec % 3600) / 60);
-    if (h > 0) return `${h}h ${m}m talk`;
-    return `${m}m talk`;
-  }
-
-  function initials(name) {
-    if (!name) return '?';
-    return name.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
-  }
-
-  function emptyState(msg) {
-    return `<div class="empty-state">${msg}</div>`;
-  }
-
-  function escHtml(str) {
-    if (!str) return '';
-    return String(str)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-  }
-
-  function getCallDir(call) {
-    const d = (call.direction || '').toLowerCase();
-    if (d === 'outbound' || d === 'outgoing') return 'outbound';
-    if (d === 'inbound' || d === 'incoming') return 'inbound';
-    const missed = (call.status || '').toLowerCase() === 'no-answer' || call.missed === true;
-    if (missed) return 'missed';
+  function getCallDir(c) {
+    const dir = (c.direction || c.type || '').toLowerCase();
+    if (dir.includes('inbound')) return 'inbound';
+    if (dir.includes('outbound')) return 'outbound';
+    const status = (c.status || '').toLowerCase();
+    if (status === 'no-answer' || status === 'busy' || status === 'no_answer' || status === 'missed') return 'missed';
+    if (dir.includes('missed')) return 'missed';
     return 'outbound';
   }
 
-  function isAppointmentStage(stageName) {
-    if (!stageName) return false;
-    const s = stageName.toLowerCase();
-    return s.includes('appt') || s.includes('appointment') || s.includes('booked') || s.includes('scheduled');
+  function getCallDuration(c) {
+    return c.duration || c.meta?.call?.duration || 0;
   }
 
-  function getWeekBounds(offsetWeeks) {
-    const now = new Date();
-    const dayOfWeek = now.getDay();
-    const monday = new Date(now);
-    monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7) + (offsetWeeks || 0) * 7);
-    monday.setHours(0, 0, 0, 0);
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    sunday.setHours(23, 59, 59, 999);
-    return { start: monday, end: sunday };
+  function getRepById(id) {
+    return appData.config.reps.find(r => r.userId === id) || null;
+  }
+  function getRepName(id) {
+    const r = getRepById(id);
+    return r ? r.name : (id ? id.slice(0, 8) : 'Unknown');
+  }
+  function getClientName(locId) {
+    const c = appData.config.clients.find(cl => cl.locationId === locId);
+    return c ? c.name : locId;
   }
 
-  function formatWeekLabel(start, end) {
-    const opts = { month: 'short', day: 'numeric' };
-    return start.toLocaleDateString('en-US', opts) + ' – ' + end.toLocaleDateString('en-US', opts);
+  // Fix 1: Use lastStageChangeAt as win date for SPIFF
+  function getWonDate(opp) {
+    if ((opp.status || '').toLowerCase() !== 'won') return null;
+    return parseDate(opp.lastStageChangeAt || opp.dateUpdated || opp.dateAdded);
   }
 
-  // ─── Filter Helpers ──────────────────────────────────────────────────────────
-  function filteredOpps() {
-    const cutoff = getDateCutoff();
-    return appData.opportunities.filter(o => {
-      if (filters.clientId !== 'all' && o._clientId !== filters.clientId) return false;
-      if (filters.pipelineId !== 'all' && o.pipelineId !== filters.pipelineId) return false;
-      const d = parseDate(o.dateAdded || o.createdAt || o.dateUpdated);
-      if (d && d < cutoff) return false;
-      return true;
-    });
-  }
-
-  function filteredCalls() {
-    const cutoff = getDateCutoff(filters.callsDays);
-    const search = filters.callSearch.toLowerCase().trim();
-    return appData.calls.filter(c => {
-      if (filters.clientId !== 'all' && c._clientId !== filters.clientId) return false;
-      if (filters.pipelineId !== 'all') {
-        const clientsWithPipeline = appData.config.clients
-          .filter(cl => cl.pipelines.some(p => p.pipelineId === filters.pipelineId))
-          .map(cl => cl.locationId);
-        if (!clientsWithPipeline.includes(c._clientId)) return false;
+  function buildNotesByConvId() {
+    appData.notesByConvId = {};
+    Object.entries(appData.callNotes).forEach(([messageId, note]) => {
+      if (note.conversationId) {
+        appData.notesByConvId[note.conversationId] = { ...note, messageId };
       }
-      const d = parseDate(c.dateAdded);
-      if (d && d < cutoff) return false;
-      if (filters.repId && c.userId !== filters.repId) return false;
-      if (search) {
-        const name = (c.contactName || c.phone || '').toLowerCase();
-        if (!name.includes(search)) return false;
+    });
+  }
+
+  function buildContactMaps() {
+    appData.contactWonSet = new Set();
+    appData.allContactOppMap = {};
+    appData.opportunities.forEach(o => {
+      if (!o.contactId) return;
+      if (!appData.allContactOppMap[o.contactId]) appData.allContactOppMap[o.contactId] = [];
+      appData.allContactOppMap[o.contactId].push(o);
+      if ((o.status || '').toLowerCase() === 'won') {
+        appData.contactWonSet.add(o.contactId);
       }
-      return true;
     });
   }
 
-  function buildContactOppMap(opps) {
-    const map = {};
-    opps.forEach(o => {
-      const cid = o.contactId || (o.contact && o.contact.id);
-      if (!cid) return;
-      if (!map[cid]) map[cid] = [];
-      map[cid].push(o);
-    });
-    return map;
+  function getActiveFilterCount() {
+    let n = 0;
+    if (callFilters.repId) n++;
+    if (callFilters.clientId !== 'all') n++;
+    if (callFilters.fromDate || callFilters.toDate || callFilters.days !== 30) n++;
+    if (callFilters.dir !== 'all') n++;
+    if (callFilters.search) n++;
+    if (callFilters.outcome !== 'all') n++;
+    if (callFilters.minDuration > 0) n++;
+    if (callFilters.flaggedOnly) n++;
+    if (callFilters.minAiScore > 0) n++;
+    return n;
   }
 
-  function getRepName(userId) {
-    if (!userId) return null;
-    const rep = (appData.config.reps || []).find(r => r.id === userId);
-    return rep ? rep.name : null;
+  function updateFilterBadge() {
+    const n = getActiveFilterCount();
+    if (n > 0) {
+      $filterCountBadge.textContent = `${n} active`;
+      $filterCountBadge.classList.remove('hidden');
+      $clearFiltersBtn.classList.remove('hidden');
+    } else {
+      $filterCountBadge.classList.add('hidden');
+      $clearFiltersBtn.classList.add('hidden');
+    }
   }
 
-  // ─── Data Loading ────────────────────────────────────────────────────────────
+  function clearAllCallFilters() {
+    callFilters.repId = null;
+    callFilters.clientId = 'all';
+    callFilters.days = 30;
+    callFilters.fromDate = null;
+    callFilters.toDate = null;
+    callFilters.dir = 'all';
+    callFilters.search = '';
+    callFilters.outcome = 'all';
+    callFilters.minDuration = 0;
+    callFilters.flaggedOnly = false;
+    callFilters.minAiScore = 0;
+    // Reset DOM
+    $callsSearch.value = '';
+    $callsRepSelect.value = 'all';
+    $callsClientSelect.value = 'all';
+    $callsDateSelect.value = '30';
+    $callsFromDate.value = '';
+    $callsToDate.value = '';
+    $customDateInputs.classList.add('hidden');
+    $callsOutcomeSelect.value = 'all';
+    $callsMinDurSelect.value = '0';
+    $callsAiScoreSelect.value = '0';
+    $callsFlaggedToggle.checked = false;
+    document.querySelectorAll('.dtab').forEach(t => t.classList.toggle('active', t.dataset.dir === 'all'));
+    updateFilterBadge();
+    renderCallLog();
+  }
+
+  // ─── Data Fetching ───────────────────────────────────────────────────────────
+  const callsCache = {};
+
+  async function fetchCalls(locationId, apiKey) {
+    const now = Date.now();
+    if (callsCache[locationId] && now - callsCache[locationId].ts < 5 * 60 * 1000) {
+      return callsCache[locationId].data;
+    }
+    const url = `/api/locations/${locationId}/calls?page=1&limit=100`;
+    const res = await apiFetch(url);
+    const calls = (Array.isArray(res) ? res : res.conversations || res.calls || [])
+      .filter(c => (c.lastMessageType || '').toLowerCase().includes('call'));
+    callsCache[locationId] = { ts: now, data: calls };
+    return calls;
+  }
+
   async function fetchAll() {
     $loadingOverlay.classList.remove('hidden');
-    $loadingMsg.textContent = 'Loading config…';
-
     try {
-      const config = await apiFetch('/api/config');
-      appData.config = config;
-      const { clients, reps } = config;
-
-      if (clients.length === 0) {
-        $loadingOverlay.classList.add('hidden');
-        showError('No clients configured.');
-        renderAll();
-        return;
-      }
-
-      $loadingMsg.textContent = `Fetching data for ${clients.length} client${clients.length > 1 ? 's' : ''}…`;
-
-      const oppFetches = clients.flatMap(client =>
-        client.pipelines.length > 0
-          ? client.pipelines.map(p =>
-              apiFetch(`/api/locations/${client.locationId}/opportunities?pipelineId=${encodeURIComponent(p.pipelineId)}`)
-                .then(d => ({ clientId: client.locationId, pipelineId: p.pipelineId, opportunities: d.opportunities || [], error: null }))
-                .catch(err => ({ clientId: client.locationId, pipelineId: p.pipelineId, opportunities: [], error: err.message }))
-            )
-          : [apiFetch(`/api/locations/${client.locationId}/opportunities`)
-              .then(d => ({ clientId: client.locationId, pipelineId: null, opportunities: d.opportunities || [], error: null }))
-              .catch(err => ({ clientId: client.locationId, pipelineId: null, opportunities: [], error: err.message }))]
-      );
-
-      const callFetches = clients.map(client =>
-        apiFetch(`/api/locations/${client.locationId}/calls`)
-          .then(d => ({ clientId: client.locationId, calls: d.calls || [], error: null }))
-          .catch(err => ({ clientId: client.locationId, calls: [], error: err.message }))
-      );
-
-      const smsFetches = clients.map(client =>
-        apiFetch(`/api/locations/${client.locationId}/sms`)
-          .then(d => ({ clientId: client.locationId, convos: d.conversations || [], error: null }))
-          .catch(() => ({ clientId: client.locationId, convos: [], error: null }))
-      );
-
-      const [oppResults, callResults, smsResults] = await Promise.all([
-        Promise.all(oppFetches),
-        Promise.all(callFetches),
-        Promise.all(smsFetches),
+      const [config, notes, rubric] = await Promise.all([
+        apiFetch('/api/config'),
+        apiFetch('/api/call-notes').catch(() => ({})),
+        apiFetch('/api/scoring-rubric').catch(() => ({ default: '', repOverrides: {} })),
       ]);
+      appData.config = config;
+      appData.callNotes = notes || {};
+      appData.scoringRubric = rubric || { default: '', repOverrides: {} };
+      buildNotesByConvId();
+
+      populateSelects();
+
+      const clientCount = config.clients.length;
+      $loadingMsg.textContent = `Fetching data for ${clientCount} client${clientCount > 1 ? 's' : ''}…`;
+
+      const results = await Promise.allSettled(
+        config.clients.map(cl => fetchClientData(cl))
+      );
 
       appData.opportunities = [];
-      oppResults.forEach(r => {
-        if (r.error) showError(`Opportunities for ${r.clientId}: ${r.error}`);
-        r.opportunities.forEach(o => appData.opportunities.push({ ...o, _clientId: r.clientId, _pipelineId: r.pipelineId }));
-      });
-
       appData.calls = [];
-      callResults.forEach(r => {
-        if (r.error) showError(`Calls for ${r.clientId}: ${r.error}`);
-        r.calls.forEach(c => appData.calls.push({ ...c, _clientId: r.clientId }));
-      });
-      // Deduplicate by conversationId
-      {
-        const seen = new Map();
-        appData.calls = appData.calls.filter(c => {
-          if (!c.conversationId || seen.has(c.conversationId)) return false;
-          seen.set(c.conversationId, true);
-          return true;
-        });
-      }
-
       appData.smsConvos = [];
-      smsResults.forEach(r => {
-        r.convos.forEach(c => appData.smsConvos.push({ ...c, _clientId: r.clientId }));
+
+      results.forEach((r, i) => {
+        if (r.status === 'fulfilled' && r.value) {
+          appData.opportunities.push(...(r.value.opportunities || []));
+          const calls = (r.value.calls || []).map(c => ({ ...c, _clientId: config.clients[i].locationId }));
+          appData.calls.push(...calls);
+          appData.smsConvos.push(...(r.value.sms || []));
+        } else if (r.status === 'rejected') {
+          console.warn('[fetchAll] client error:', r.reason);
+        }
       });
 
-      // Fetch users for console reference
-      const userFetches = clients.map(client =>
-        apiFetch(`/api/locations/${client.locationId}/users`)
-          .then(d => ({ locationId: client.locationId, clientName: client.name, users: d.users || [] }))
-          .catch(() => ({ locationId: client.locationId, clientName: client.name, users: [] }))
-      );
-      const userResults = await Promise.all(userFetches);
-      appData.fetchedUsers = [];
-      userResults.forEach(r => {
-        r.users.forEach(u => appData.fetchedUsers.push({
-          id: u.id,
-          name: u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim(),
-          email: u.email || '',
-          locationId: r.locationId,
-          clientName: r.clientName,
-        }));
-      });
+      buildContactMaps();
+      logFetchedUsers();
 
-      if (appData.fetchedUsers.length > 0) {
-        console.log('[Revryze] Fetched GHL users — copy IDs into reps-config.json:');
-        appData.fetchedUsers.forEach(u => {
-          console.log(`  [${u.clientName}] id: "${u.id}"  name: "${u.name}"  email: "${u.email}"`);
-        });
-      }
+      renderCommandCenter();
+      renderCallLog();
+      renderSmsList();
+      buildSpiffWeekOptions();
+      renderSpiff();
 
-      populateDropdowns();
-      renderAll();
+      populateRubricEditor();
     } catch (err) {
-      showError('Failed to load dashboard: ' + err.message);
+      console.error('[fetchAll] error:', err && err.message ? err.message : String(err));
+      console.error('[fetchAll] stack:', err && err.stack);
+      showError('Failed to load data: ' + (err && err.message ? err.message : String(err)));
     } finally {
       $loadingOverlay.classList.add('hidden');
     }
   }
 
-  // ─── Dropdowns ───────────────────────────────────────────────────────────────
-  function populateDropdowns() {
-    const clients = appData.config.clients;
-    const reps = appData.config.reps || [];
-
-    // Command Center client dropdown
-    $ccClientSelect.innerHTML = '<option value="all">All clients</option>';
-    clients.forEach(c => {
-      const o = document.createElement('option');
-      o.value = c.locationId; o.textContent = c.name;
-      $ccClientSelect.appendChild(o);
-    });
-
-    // Calls tab client + rep dropdowns
-    $callsClientSelect.innerHTML = '<option value="all">All clients</option>';
-    clients.forEach(c => {
-      const o = document.createElement('option');
-      o.value = c.locationId; o.textContent = c.name;
-      $callsClientSelect.appendChild(o);
-    });
-    $callsRepSelect.innerHTML = '<option value="all">All reps</option>';
-    reps.forEach(r => {
-      const o = document.createElement('option');
-      o.value = r.id; o.textContent = r.name;
-      $callsRepSelect.appendChild(o);
-    });
-
-    // SMS client dropdown
-    $smsClientSelect.innerHTML = '<option value="all">All clients</option>';
-    clients.forEach(c => {
-      const o = document.createElement('option');
-      o.value = c.locationId; o.textContent = c.name;
-      $smsClientSelect.appendChild(o);
-    });
-
-    populateCCLocationDropdown();
-    populateSpiffWeeks();
+  function toArr(v) {
+    if (Array.isArray(v)) return v;
+    if (v && Array.isArray(v.opportunities)) return v.opportunities;
+    if (v && Array.isArray(v.conversations)) return v.conversations;
+    if (v && Array.isArray(v.calls)) return v.calls;
+    if (v && Array.isArray(v.sms)) return v.sms;
+    return [];
   }
 
-  function populateCCLocationDropdown() {
-    const allClients = appData.config.clients;
-    const selectedClients = filters.clientId === 'all'
-      ? allClients
-      : allClients.filter(c => c.locationId === filters.clientId);
-    const pipelines = [];
-    selectedClients.forEach(client => {
-      (client.pipelines || []).forEach(p => {
-        pipelines.push({
-          pipelineId: p.pipelineId,
-          label: filters.clientId === 'all' ? `${client.name} — ${p.name}` : p.name,
+  async function fetchClientData(cl) {
+    const [oppsRes, callsRes, smsRes] = await Promise.allSettled([
+      apiFetch(`/api/locations/${cl.locationId}/opportunities`),
+      apiFetch(`/api/locations/${cl.locationId}/calls`),
+      apiFetch(`/api/locations/${cl.locationId}/sms`),
+    ]);
+    const oppsRaw  = oppsRes.status  === 'fulfilled' ? oppsRes.value  : null;
+    const callsRaw = callsRes.status === 'fulfilled' ? callsRes.value : null;
+    const smsRaw   = smsRes.status   === 'fulfilled' ? smsRes.value   : null;
+    return {
+      opportunities: oppsRaw  ? (Array.isArray(oppsRaw.opportunities)  ? oppsRaw.opportunities  : toArr(oppsRaw))  : [],
+      calls:         callsRaw ? (Array.isArray(callsRaw.conversations)  ? callsRaw.conversations : toArr(callsRaw)) : [],
+      sms:           smsRaw   ? (Array.isArray(smsRaw.conversations)    ? smsRaw.conversations   : toArr(smsRaw))   : [],
+    };
+  }
+
+  function logFetchedUsers() {
+    const seen = new Set();
+    const lines = [];
+    appData.config.clients.forEach(cl => {
+      appData.calls
+        .filter(c => c._clientId === cl.locationId && c.userId && !seen.has(c.userId))
+        .forEach(c => {
+          seen.add(c.userId);
+          const rep = getRepById(c.userId);
+          lines.push(`  [${cl.name}] id: "${c.userId}"  name: "${rep ? rep.name : 'unknown'}"`);
         });
+    });
+    console.log('[Revryze] Fetched GHL users — copy IDs into reps-config.json:');
+    lines.forEach(l => console.log(l));
+  }
+
+  // ─── Populate Selects ────────────────────────────────────────────────────────
+  function populateSelects() {
+    const clients = appData.config.clients;
+    const reps = appData.config.reps;
+
+    [[$ccClientSelect], [$callsClientSelect], [$smsClientSelect]].forEach(([el]) => {
+      while (el.options.length > 1) el.remove(1);
+      clients.forEach(cl => {
+        const o = new Option(cl.name, cl.locationId);
+        el.add(o);
       });
     });
 
-    $ccLocationSelect.innerHTML = '<option value="all">All pipelines</option>';
-    pipelines.forEach(p => {
-      const o = document.createElement('option');
-      o.value = p.pipelineId; o.textContent = p.label;
-      $ccLocationSelect.appendChild(o);
+    while ($ccLocationSelect.options.length > 1) $ccLocationSelect.remove(1);
+    clients.forEach(cl => {
+      (cl.pipelines || []).forEach(p => {
+        $ccLocationSelect.add(new Option(`${cl.name} — ${p.name || p.pipelineId}`, p.pipelineId));
+      });
     });
-    $ccLocationSelect.disabled = pipelines.length === 0;
-    if (filters.pipelineId !== 'all' && !pipelines.some(p => p.pipelineId === filters.pipelineId)) {
-      filters.pipelineId = 'all';
-    }
-    $ccLocationSelect.value = filters.pipelineId;
+
+    while ($callsRepSelect.options.length > 1) $callsRepSelect.remove(1);
+    reps.forEach(r => $callsRepSelect.add(new Option(r.name, r.userId)));
+
+    while ($rubricRepSelect.options.length > 1) $rubricRepSelect.remove(1);
+    reps.forEach(r => $rubricRepSelect.add(new Option(r.name, r.userId)));
   }
 
-  function populateSpiffWeeks() {
-    $spiffWeekSelect.innerHTML = '';
-    for (let i = 0; i >= -12; i--) {
-      const { start, end } = getWeekBounds(i);
-      const o = document.createElement('option');
-      o.value = String(i);
-      o.textContent = i === 0 ? `Current Week — ${formatWeekLabel(start, end)}` : formatWeekLabel(start, end);
-      $spiffWeekSelect.appendChild(o);
-    }
-    $spiffWeekSelect.value = '0';
+  // ─── Command Center ──────────────────────────────────────────────────────────
+  function filteredOpps() {
+    const cutoff = getDateCutoff(ccFilters.days);
+    return appData.opportunities.filter(o => {
+      if (ccFilters.clientId !== 'all' && o.locationId !== ccFilters.clientId) return false;
+      if (ccFilters.pipelineId !== 'all' && o.pipelineId !== ccFilters.pipelineId) return false;
+      const d = parseDate(o.dateAdded);
+      if (d && d < cutoff) return false;
+      return true;
+    });
   }
 
-  // ─── Tab Switching ────────────────────────────────────────────────────────────
-  function switchTab(tabId) {
-    activeTab = tabId;
-    $navTabs.forEach(t => t.classList.toggle('active', t.dataset.tab === tabId));
-    $tabSections.forEach(s => s.classList.toggle('hidden', s.id !== `tab-${tabId}`));
-    if (tabId === 'spiff') renderSpiff();
+  function filteredCallsCC() {
+    const cutoff = getDateCutoff(ccFilters.days);
+    return appData.calls.filter(c => {
+      if (ccFilters.clientId !== 'all' && c._clientId !== ccFilters.clientId) return false;
+      const d = parseDate(c.dateAdded);
+      if (d && d < cutoff) return false;
+      return true;
+    });
   }
 
-  // ─── Render All ──────────────────────────────────────────────────────────────
-  function renderAll() {
+  function renderCommandCenter() {
     const opps = filteredOpps();
-    const calls = filteredCalls();
-    const contactOppMap = buildContactOppMap(opps);
-    renderMetrics(opps, calls);
+    const calls = filteredCallsCC();
+
+    const wonOpps = opps.filter(o => (o.status || '').toLowerCase() === 'won');
+    const sold = wonOpps.length;
+    const revenue = wonOpps.reduce((s, o) => s + (o.monetaryValue || 0), 0);
+    const totalCalls = calls.length;
+    const talkSec = calls.reduce((s, c) => s + getCallDuration(c), 0);
+    const closeRate = calls.length ? ((sold / calls.length) * 100).toFixed(1) + '%' : '—';
+
+    $mSold.textContent    = sold;
+    $mRevenue.textContent = fmt$(revenue);
+    $mCalls.textContent   = totalCalls;
+    $mTalktime.textContent= fmtDurLong(talkSec);
+    $mRate.textContent    = closeRate;
+
     renderRepLeaderboard(opps, calls);
     renderClientLeaderboard(opps, calls);
-    renderCallLog(calls, contactOppMap);
-    renderSmsTab();
-    renderSpiff();
-  }
-
-  // ─── Metrics ─────────────────────────────────────────────────────────────────
-  function renderMetrics(opps, calls) {
-    const sold = opps.filter(o => (o.status || '').toLowerCase() === 'won').length;
-    const revenue = opps
-      .filter(o => (o.status || '').toLowerCase() === 'won')
-      .reduce((s, o) => s + parseFloat(o.monetaryValue || o.value || 0), 0);
-    const totalCalls = calls.length;
-    const totalDuration = calls.reduce((s, c) => s + (c.duration || 0), 0);
-    const rateDenom = totalCalls > 0 ? totalCalls : opps.length;
-    const rate = rateDenom > 0 ? ((sold / rateDenom) * 100).toFixed(1) : '0.0';
-
-    $mSold.textContent = sold;
-    $mRevenue.textContent = formatCurrency(revenue);
-    $mCalls.textContent = totalCalls;
-    $mTalktime.textContent = formatTalkTime(totalDuration);
-    $mRate.textContent = rate + '%';
-  }
-
-  // ─── Rep Leaderboard ─────────────────────────────────────────────────────────
-  function computeRepStats(repId, opps, calls) {
-    const repOpps = opps.filter(o => o.assignedTo === repId);
-    const repCalls = calls.filter(c => c.userId === repId);
-    const sold = repOpps.filter(o => (o.status || '').toLowerCase() === 'won').length;
-    const revenue = repOpps
-      .filter(o => (o.status || '').toLowerCase() === 'won')
-      .reduce((s, o) => s + parseFloat(o.monetaryValue || o.value || 0), 0);
-    const totalCalls = repCalls.length;
-    const totalDurationSec = repCalls.reduce((sum, c) => sum + (c.duration || 0), 0);
-    const crDenom = totalCalls > 0 ? totalCalls : repOpps.length;
-    const closeRate = crDenom > 0 ? parseFloat(((sold / crDenom) * 100).toFixed(1)) : 0;
-    return { sold, revenue, calls: totalCalls, totalDurationSec, closeRate };
   }
 
   function renderRepLeaderboard(opps, calls) {
-    const reps = appData.config.reps || [];
-    if (reps.length === 0) {
-      $repLbList.innerHTML = emptyState('Add closers to reps-config.json to populate the leaderboard');
-      return;
-    }
+    const sort = $repSort.value;
+    const reps = appData.config.reps;
 
-    const sortKey = $repSort.value;
-    const stats = reps.map(rep => ({ rep, stats: computeRepStats(rep.id, opps, calls) }));
-    const sortVal = s => {
-      if (sortKey === 'sold') return s.sold;
-      if (sortKey === 'revenue') return s.revenue;
-      if (sortKey === 'calls') return s.calls;
-      if (sortKey === 'talktime') return s.totalDurationSec;
+    const rows = reps.map(r => {
+      const rOpps  = opps.filter(o => o.assignedTo === r.userId);
+      const rWon   = rOpps.filter(o => (o.status || '').toLowerCase() === 'won');
+      const rCalls = calls.filter(c => c.userId === r.userId);
+      const sold   = rWon.length;
+      const rev    = rWon.reduce((s, o) => s + (o.monetaryValue || 0), 0);
+      const nCalls = rCalls.length;
+      const talk   = rCalls.reduce((s, c) => s + getCallDuration(c), 0);
+      const rate   = nCalls ? ((sold / nCalls) * 100).toFixed(1) + '%' : '—';
+      return { rep: r, sold, rev, nCalls, talk, rate };
+    });
+
+    rows.sort((a, b) => {
+      if (sort === 'sold')     return b.sold - a.sold;
+      if (sort === 'revenue')  return b.rev - a.rev;
+      if (sort === 'calls')    return b.nCalls - a.nCalls;
+      if (sort === 'talktime') return b.talk - a.talk;
       return 0;
-    };
-    stats.sort((a, b) => sortVal(b.stats) - sortVal(a.stats));
+    });
 
-    $repLbList.innerHTML = stats.map(({ rep, stats: s }, i) => {
-      const rank = i + 1;
-      const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
-      const active = filters.repId === rep.id ? 'active' : '';
-      const statVal = sortKey === 'revenue'
-        ? formatCurrency(s.revenue)
-        : sortKey === 'talktime'
-          ? formatTalkTime(s.totalDurationSec)
-          : sortKey === 'sold' ? s.sold : s.calls;
-      return `
-        <div class="lb-row ${active}" data-rep-id="${rep.id}">
-          <div class="lb-rank ${rankClass}">${rank}</div>
-          <div class="lb-avatar">${initials(rep.name)}</div>
-          <div class="lb-info">
-            <div class="lb-name">${escHtml(rep.name)}</div>
-            <div class="lb-sub">${s.calls} calls &middot; ${s.closeRate}% close &middot; ${formatTalkTimeFull(s.totalDurationSec)}</div>
-          </div>
-          <div class="lb-stat">${statVal}</div>
-        </div>`;
-    }).join('');
+    $repLbList.innerHTML = rows.map((row, i) => `
+      <div class="lb-row" data-rep-id="${row.rep.userId}">
+        <span class="lb-rank">${i + 1}</span>
+        <div class="lb-avatar">${initials(row.rep.name)}</div>
+        <div class="lb-info">
+          <div class="lb-name">${row.rep.name}</div>
+          <div class="lb-sub">${row.nCalls} calls · ${fmtDurLong(row.talk)}</div>
+        </div>
+        <div class="lb-right">
+          <div class="lb-val">${row.sold}</div>
+          <div class="lb-sub">${row.rate} close</div>
+        </div>
+      </div>
+    `).join('');
 
-    $repLbList.querySelectorAll('.lb-row').forEach(row => {
-      row.addEventListener('click', () => {
-        const repId = row.dataset.repId;
-        filters.repId = filters.repId === repId ? null : repId;
-        filters.callDir = 'all';
-        $dirTabs.querySelectorAll('.dtab').forEach(t => t.classList.toggle('active', t.dataset.dir === 'all'));
-        $callsRepSelect.value = filters.repId || 'all';
-        const updatedCalls = filteredCalls();
-        const updatedOpps = filteredOpps();
-        const map = buildContactOppMap(updatedOpps);
-        renderRepLeaderboard(updatedOpps, updatedCalls);
-        renderCallLog(updatedCalls, map);
-        closeCallDetail();
-      });
+    $repLbList.querySelectorAll('.lb-row[data-rep-id]').forEach(row => {
+      row.addEventListener('click', () => openRepProfile(row.dataset.repId));
     });
   }
 
-  // ─── Client Leaderboard ──────────────────────────────────────────────────────
   function renderClientLeaderboard(opps, calls) {
-    const { clients, reps } = appData.config;
-    if (!clients || clients.length === 0) {
-      $clientLbList.innerHTML = emptyState('No clients configured');
+    const sort = $clientSort.value;
+    const clients = appData.config.clients;
+
+    const rows = clients.map(cl => {
+      const cOpps  = opps.filter(o => o.locationId === cl.locationId);
+      const cWon   = cOpps.filter(o => (o.status || '').toLowerCase() === 'won');
+      const cCalls = calls.filter(c => c._clientId === cl.locationId);
+      const sold   = cWon.length;
+      const rev    = cWon.reduce((s, o) => s + (o.monetaryValue || 0), 0);
+      const rate   = cCalls.length ? ((sold / cCalls.length) * 100).toFixed(1) + '%' : '—';
+      return { cl, sold, rev, rate, calls: cCalls.length };
+    });
+
+    rows.sort((a, b) => {
+      if (sort === 'sold')      return b.sold - a.sold;
+      if (sort === 'revenue')   return b.rev - a.rev;
+      if (sort === 'closeRate') return parseFloat(b.rate) - parseFloat(a.rate);
+      return 0;
+    });
+
+    $clientLbList.innerHTML = rows.map((row, i) => `
+      <div class="lb-row">
+        <span class="lb-rank">${i + 1}</span>
+        <div class="lb-avatar" style="background:#1e2a2a;color:var(--accent)">
+          ${(row.cl.name || '?')[0].toUpperCase()}
+        </div>
+        <div class="lb-info">
+          <div class="lb-name">${row.cl.name}</div>
+          <div class="lb-sub">${row.calls} calls</div>
+        </div>
+        <div class="lb-right">
+          <div class="lb-val">${row.sold}</div>
+          <div class="lb-sub">${row.rate} close · ${fmt$(row.rev)}</div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // ─── Calls Tab ───────────────────────────────────────────────────────────────
+  function getFilteredCalls() {
+    const cutoff = callFilters.fromDate ? null : getDateCutoff(callFilters.days);
+    const search = callFilters.search.toLowerCase().trim();
+
+    return appData.calls.filter(c => {
+      // Client
+      if (callFilters.clientId !== 'all' && c._clientId !== callFilters.clientId) return false;
+      // Rep
+      if (callFilters.repId && c.userId !== callFilters.repId) return false;
+      // Date
+      const d = parseDate(c.dateAdded);
+      if (callFilters.fromDate && d && d < callFilters.fromDate) return false;
+      if (callFilters.toDate && d && d > callFilters.toDate) return false;
+      if (!callFilters.fromDate && cutoff && d && d < cutoff) return false;
+      // Direction
+      const dir = getCallDir(c);
+      if (callFilters.dir !== 'all' && dir !== callFilters.dir) return false;
+      // Search
+      if (search && !(c.contactName || c.phone || '').toLowerCase().includes(search)) return false;
+      // Outcome
+      if (callFilters.outcome !== 'all') {
+        if (callFilters.outcome === 'noanswer') {
+          if (dir !== 'missed') return false;
+        } else if (callFilters.outcome === 'sold') {
+          if (!appData.contactWonSet.has(c.contactId)) return false;
+        } else if (callFilters.outcome === 'pipeline') {
+          if (appData.contactWonSet.has(c.contactId)) return false;
+          if (!appData.allContactOppMap[c.contactId]?.length) return false;
+        }
+      }
+      // Min duration
+      if (callFilters.minDuration > 0 && getCallDuration(c) < callFilters.minDuration) return false;
+      // Flagged
+      if (callFilters.flaggedOnly) {
+        const note = appData.notesByConvId[c.conversationId || c.id];
+        if (!note || !note.flagged) return false;
+      }
+      // AI score
+      if (callFilters.minAiScore > 0) {
+        const note = appData.notesByConvId[c.conversationId || c.id];
+        const score = note?.aiAnalysis?.score;
+        if (!score || score < callFilters.minAiScore) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderCallLog() {
+    const calls = getFilteredCalls();
+    $callLogCount.textContent = `${calls.length} calls`;
+    updateFilterBadge();
+
+    if (!calls.length) {
+      $callList.innerHTML = '<div class="empty-state">No calls match the current filters.</div>';
       return;
     }
-    const sortKey = $clientSort.value;
-    const rows = clients.map(client => {
-      const clientOpps = opps.filter(o => o._clientId === client.locationId);
-      const clientCalls = calls.filter(c => c._clientId === client.locationId);
-      const sold = clientOpps.filter(o => (o.status || '').toLowerCase() === 'won').length;
-      const revenue = clientOpps
-        .filter(o => (o.status || '').toLowerCase() === 'won')
-        .reduce((s, o) => s + parseFloat(o.monetaryValue || o.value || 0), 0);
-      const totalCalls = clientCalls.length;
-      const crDenom = totalCalls > 0 ? totalCalls : clientOpps.length;
-      const closeRate = crDenom > 0 ? parseFloat(((sold / crDenom) * 100).toFixed(1)) : 0;
-      return { client, sold, revenue, closeRate, totalCalls };
-    });
-    const sortVal = r => sortKey === 'sold' ? r.sold : sortKey === 'revenue' ? r.revenue : r.closeRate;
-    rows.sort((a, b) => sortVal(b) - sortVal(a));
 
-    $clientLbList.innerHTML = rows.map(r => {
-      const active = filters.clientId === r.client.locationId ? 'active' : '';
-      return `
-        <div class="lb-row lb-row-client ${active}" data-client-id="${r.client.locationId}">
-          <div class="lb-info lb-client-name">
-            <div class="lb-name">${escHtml(r.client.name)}</div>
-            <div class="lb-sub">${r.totalCalls} calls</div>
-          </div>
-          <div class="lb-client-stats">
-            <div class="lb-client-stat">
-              <div class="lb-client-stat-val">${r.sold}</div>
-              <div class="lb-client-stat-lbl">Sold</div>
-            </div>
-            <div class="lb-client-stat">
-              <div class="lb-client-stat-val">${formatCurrency(r.revenue)}</div>
-              <div class="lb-client-stat-lbl">Revenue</div>
-            </div>
-            <div class="lb-client-stat">
-              <div class="lb-client-stat-val">${r.closeRate}%</div>
-              <div class="lb-client-stat-lbl">Close</div>
-            </div>
-          </div>
-        </div>`;
-    }).join('');
-
-    $clientLbList.querySelectorAll('.lb-row').forEach(row => {
-      row.addEventListener('click', () => {
-        const clientId = row.dataset.clientId;
-        filters.clientId = filters.clientId === clientId ? 'all' : clientId;
-        filters.pipelineId = 'all';
-        filters.repId = null;
-        filters.callDir = 'all';
-        $ccClientSelect.value = filters.clientId;
-        populateCCLocationDropdown();
-        $dirTabs.querySelectorAll('.dtab').forEach(t => t.classList.toggle('active', t.dataset.dir === 'all'));
-        closeCallDetail();
-        renderAll();
-      });
-    });
-  }
-
-  // ─── Call Log ────────────────────────────────────────────────────────────────
-  function callOutcomeBadge(call, contactOppMap) {
-    const opps = call.contactId ? (contactOppMap[call.contactId] || []) : [];
-    if (opps.length === 0) {
-      const dir = getCallDir(call);
-      const label = dir === 'outbound' ? 'Outbound' : dir === 'missed' ? 'Missed' : 'Inbound';
-      return `<span class="badge badge-gray">${label}</span>`;
-    }
-    const hasWon = opps.some(o => (o.status || '').toLowerCase() === 'won' ||
-      (o.pipelineStage || o.stageName || '').toLowerCase() === 'closed won');
-    if (hasWon) return `<span class="badge badge-sold">Sold</span>`;
-    return `<span class="badge badge-pipeline">In Pipeline</span>`;
-  }
-
-  function renderCallLog(calls, contactOppMap) {
-    let displayed = calls;
-    if (filters.callDir !== 'all') {
-      displayed = calls.filter(c => getCallDir(c) === filters.callDir);
-    }
-    displayed = [...displayed].sort((a, b) => {
+    calls.sort((a, b) => {
       const da = parseDate(a.dateAdded), db = parseDate(b.dateAdded);
-      if (!da && !db) return 0; if (!da) return 1; if (!db) return -1;
-      return db - da;
+      return (db || 0) - (da || 0);
     });
 
-    const title = filters.repId
-      ? ((appData.config.reps || []).find(r => r.id === filters.repId) || {}).name + ' — Calls'
-      : 'All Calls';
-    $callLogTitle.textContent = title;
-    $callLogCount.textContent = displayed.length ? `${displayed.length} calls` : '';
-
-    if (displayed.length === 0) {
-      $callList.innerHTML = emptyState('No calls found for this period');
-      return;
-    }
-
-    $callList.innerHTML = displayed.map(call => {
-      const dir = getCallDir(call);
-      const contactName = call.contactName || call.phone || 'Unknown';
-      const repName = getRepName(call.userId);
-      const dateStr = formatDate(call.dateAdded);
-      const badge = callOutcomeBadge(call, contactOppMap);
-      return `
-        <div class="call-row" data-conv-id="${escHtml(call.conversationId)}" data-client-id="${escHtml(call._clientId)}">
-          <div class="dir-dot ${dir}"></div>
-          <div class="call-info">
-            <div class="call-contact">${escHtml(contactName)}</div>
-            ${repName ? `<div class="call-rep">${escHtml(repName)}</div>` : ''}
-            <div class="call-time-row">${dateStr} &middot; <span class="call-dur">—</span></div>
-          </div>
-          ${badge}
-        </div>`;
-    }).join('');
+    $callList.innerHTML = calls.map(c => buildCallRow(c)).join('');
 
     $callList.querySelectorAll('.call-row').forEach(row => {
-      row.addEventListener('click', () => {
+      row.addEventListener('click', e => {
+        if (e.target.closest('.call-rep')) {
+          e.stopPropagation();
+          const repId = e.target.closest('.call-rep').dataset.repId;
+          if (repId) openRepProfile(repId);
+          return;
+        }
         $callList.querySelectorAll('.call-row').forEach(r => r.classList.remove('active'));
         row.classList.add('active');
         openCallDetail(row.dataset.convId, row.dataset.clientId, row);
@@ -672,486 +634,837 @@
     });
   }
 
-  // ─── Call Detail ─────────────────────────────────────────────────────────────
+  function buildCallRow(c) {
+    const dir    = getCallDir(c);
+    const dur    = getCallDuration(c);
+    const rep    = getRepById(c.userId);
+    const repName = rep ? rep.name : '';
+    const d      = parseDate(c.dateAdded);
+    const dateStr = d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+    const note   = appData.notesByConvId[c.conversationId || c.id];
+    const flagged = note?.flagged;
+    const aiScore = note?.aiAnalysis?.score;
+    const sold   = appData.contactWonSet.has(c.contactId);
+    const convId = c.conversationId || c.id;
+
+    let dirIcon = '↗', dirClass = 'dir-out', dirLabel = 'Outbound';
+    if (dir === 'inbound') { dirIcon = '↙'; dirClass = 'dir-in';     dirLabel = 'Inbound';  }
+    if (dir === 'missed')  { dirIcon = '↗'; dirClass = 'dir-missed'; dirLabel = 'Missed';   }
+
+    return `
+      <div class="call-row" data-conv-id="${convId}" data-client-id="${c._clientId}">
+        <div class="call-dir-icon ${dirClass}" title="${dirLabel}">${dirIcon}</div>
+        <div class="call-row-main">
+          <div class="call-row-top">
+            <span class="call-contact">${c.contactName || c.phone || 'Unknown'}</span>
+            ${sold ? '<span class="badge badge-sold">Sold</span>' : ''}
+            ${flagged ? '<span class="badge badge-flag">🚩</span>' : ''}
+            ${aiScore ? `<span class="badge badge-ai">AI ${aiScore}/10</span>` : ''}
+          </div>
+          <div class="call-row-sub">
+            ${repName ? `<span class="call-rep" data-rep-id="${c.userId}">${repName}</span>` : ''}
+            <span>${getClientName(c._clientId)}</span>
+            ${dur ? `<span>${fmtDur(dur)}</span>` : ''}
+            ${dateStr ? `<span>${dateStr}</span>` : ''}
+          </div>
+        </div>
+        <svg class="call-chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+      </div>
+    `;
+  }
+
   async function openCallDetail(convId, clientId, row) {
+    currentCallConvId    = convId;
+    currentCallLocId     = clientId;
+    currentMessageId     = null;
+    currentCallRepId     = null;
+    currentCallContactId = null;
+
     $callDetail.classList.remove('hidden');
-    resetAudioPlayer();
-    $transcriptText.textContent = 'Loading…';
     $aiResults.classList.add('hidden');
-    $aiAnalyzeBtn.disabled = false;
     $aiAnalyzeBtn.textContent = '✦ Analyze with AI';
+    $aiAnalyzeBtn.disabled = false;
+    $transcriptSection.classList.remove('hidden');
+    $transcriptText.textContent = 'Loading…';
     $existingNote.classList.add('hidden');
     $managerNoteText.value = '';
     $flagToggle.checked = false;
 
-    currentCallConvId = convId;
-    currentCallLocId = clientId;
-    currentMessageId = null;
-
-    const call = appData.calls.find(c => c.conversationId === convId);
-    const clientCfg = appData.config.clients.find(c => c.locationId === clientId);
-    const contactName = call ? (call.contactName || call.phone || 'Unknown') : 'Unknown';
-    const phone = call ? (call.phone || '—') : '—';
-    const dateStr = call ? formatDate(call.dateAdded) : '';
-    const clientName = clientCfg ? clientCfg.name : (clientId || '');
-    const repName = call ? getRepName(call.userId) : null;
-
-    $callMeta.innerHTML = `
-      <div>
-        <strong>${escHtml(contactName)}</strong>
-        ${repName ? `<span class="call-meta-rep">↗ ${escHtml(repName)}</span>` : ''}
-      </div>
-      <span>${escHtml(phone)}</span>
-      <span>${dateStr}</span>
-      ${clientName ? `<span>${escHtml(clientName)}</span>` : ''}
-    `;
-
-    console.log(`[openCallDetail] convId=${convId} clientId=${clientId}`);
-
-    // Fetch messages on click (or use cached messageId)
-    let messageId = (call && call.messageId) || null;
-    if (!messageId) {
-      try {
-        const fetchUrl = `/api/conversations/${encodeURIComponent(convId)}/messages?locationId=${encodeURIComponent(clientId)}`;
-        console.log(`[openCallDetail] fetching messages: ${fetchUrl}`);
-        const msgInfo = await apiFetch(fetchUrl);
-        console.log(`[openCallDetail] messages response:`, msgInfo);
-        messageId = msgInfo.messageId || null;
-        console.log(`[openCallDetail] messageId resolved: ${messageId}`);
-
-        if (row) {
-          const durSpan = row.querySelector('.call-dur');
-          if (durSpan) {
-            const dur = msgInfo.duration;
-            durSpan.textContent = (dur && dur > 0)
-              ? `${Math.floor(dur / 60)}m ${String(Math.floor(dur % 60)).padStart(2, '0')}s`
-              : '—';
-          }
-        }
-        if (call && messageId) call.messageId = messageId;
-      } catch (err) {
-        console.error(`[openCallDetail] failed to fetch messages:`, err);
-      }
-    } else {
-      console.log(`[openCallDetail] using cached messageId: ${messageId}`);
+    // Build meta from call data
+    const call = appData.calls.find(c => (c.conversationId || c.id) === convId);
+    if (call) {
+      currentCallRepId     = call.userId;
+      currentCallContactId = call.contactId;
+      const repName = getRepName(call.userId);
+      const dir = getCallDir(call);
+      const d = parseDate(call.dateAdded);
+      const dateStr = d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+      $callMeta.innerHTML = `
+        <div class="meta-row">
+          <span class="meta-contact">${call.contactName || call.phone || 'Unknown'}</span>
+          <span class="meta-badge meta-${dir}">${dir}</span>
+        </div>
+        <div class="meta-sub">
+          <span>Rep: <strong>${repName}</strong></span>
+          <span>${getClientName(clientId)}</span>
+          ${dateStr ? `<span>${dateStr}</span>` : ''}
+        </div>
+      `;
     }
 
-    currentMessageId = messageId;
-
-    // Load recording
-    if (messageId) {
-      const recUrl = `/api/recording?messageId=${encodeURIComponent(messageId)}&locationId=${encodeURIComponent(clientId)}`;
-      console.log(`[openCallDetail] setting audio src: ${recUrl}`);
-      $audioEl.src = recUrl;
-      $audioEl.load();
-    } else {
-      console.warn(`[openCallDetail] no messageId — recording + transcript skipped`);
-    }
-
-    // Load transcript
-    if (messageId) {
-      try {
-        console.log('[transcript] fetching for messageId:', messageId, 'locationId:', clientId);
-        const tRes = await fetch(`/api/transcription?messageId=${messageId}&locationId=${clientId}`);
-        const tData = await tRes.json();
-        console.log('[transcript] raw response:', JSON.stringify(tData));
-        let text = null;
-        if (Array.isArray(tData) && tData.length > 0) {
-          text = tData.map(s => s.transcript).filter(Boolean).join(' ');
-        } else if (tData && typeof tData === 'object') {
-          text = tData.transcriptionText || tData.text || tData.transcript || null;
-        } else if (typeof tData === 'string') {
-          text = tData;
-        }
-        $transcriptText.textContent = text || 'No transcript available';
-        $transcriptText.dataset.raw = text || '';
-      } catch (err) {
-        console.error('[transcript] fetch failed:', err);
-        $transcriptText.textContent = 'No transcript available';
-        $transcriptText.dataset.raw = '';
-      }
-    } else {
-      $transcriptText.textContent = 'No transcript available';
-      $transcriptText.dataset.raw = '';
-    }
-
-    // Load manager note
-    if (messageId) {
-      try {
-        const noteData = await apiFetch(`/api/call-notes/${encodeURIComponent(messageId)}`);
-        if (noteData.note) {
-          $existingNote.innerHTML = `
-            <div>${escHtml(noteData.note)}</div>
-            <div class="existing-note-meta">Saved ${noteData.savedAt ? new Date(noteData.savedAt).toLocaleString() : ''}</div>
-          `;
-          $existingNote.classList.remove('hidden');
-          $managerNoteText.value = noteData.note;
-        }
-        if (noteData.flagged) $flagToggle.checked = true;
-      } catch (_) {}
-    }
-  }
-
-  function closeCallDetail() {
-    $callDetail.classList.add('hidden');
-    resetAudioPlayer();
-    currentCallConvId = null;
-    currentCallLocId = null;
-    currentMessageId = null;
-    $callList.querySelectorAll('.call-row').forEach(r => r.classList.remove('active'));
-  }
-
-  function resetAudioPlayer() {
-    $audioEl.pause();
-    $audioEl.removeAttribute('src');
-    $audioEl.load();
+    // Reset audio
+    $audioEl.src = '';
     $progressFill.style.width = '0%';
     $timeLabel.textContent = '0:00 / 0:00';
-    $playBtn.innerHTML = '&#9654;';
-  }
+    $playBtn.textContent = '▶';
 
-  // ─── Audio Player ─────────────────────────────────────────────────────────────
-  $playBtn.addEventListener('click', () => {
-    if (!$audioEl.src || $audioEl.src === location.href) return;
-    if ($audioEl.paused) {
-      $audioEl.play().catch(() => {});
-      $playBtn.innerHTML = '&#9646;&#9646;';
-    } else {
-      $audioEl.pause();
-      $playBtn.innerHTML = '&#9654;';
+    // Check for cached analysis (Fix 7)
+    const cachedNote = appData.notesByConvId[convId];
+    if (cachedNote) {
+      if (cachedNote.note) {
+        $existingNote.textContent = cachedNote.note;
+        $existingNote.classList.remove('hidden');
+        $managerNoteText.value = cachedNote.note;
+      }
+      $flagToggle.checked = !!cachedNote.flagged;
+      if (cachedNote.aiAnalysis) {
+        renderAiResults(cachedNote.aiAnalysis);
+        $aiAnalyzeBtn.textContent = '✦ Re-analyze';
+      }
     }
-  });
 
-  function updateAudioProgress() {
-    if (!$audioEl.duration || isNaN($audioEl.duration) || !isFinite($audioEl.duration)) return;
-    const pct = ($audioEl.currentTime / $audioEl.duration) * 100;
-    $progressFill.style.width = pct + '%';
-    $timeLabel.textContent = formatDuration($audioEl.currentTime) + ' / ' + formatDuration($audioEl.duration);
+    // Fetch recording + transcript
+    try {
+      const msgPath = `/api/conversations/${convId}/messages?locationId=${clientId}`;
+      const msgData = await apiFetch(msgPath);
+      // Server returns { messageId, duration, status, userId } summary object
+      const messageId = msgData?.messageId;
+
+      if (messageId) {
+        currentMessageId = messageId;
+
+        // Load cached note by messageId if we didn't load by convId above
+        if (!cachedNote && appData.callNotes[messageId]) {
+          const n = appData.callNotes[messageId];
+          if (n.note) {
+            $existingNote.textContent = n.note;
+            $existingNote.classList.remove('hidden');
+            $managerNoteText.value = n.note;
+          }
+          $flagToggle.checked = !!n.flagged;
+          if (n.aiAnalysis) {
+            renderAiResults(n.aiAnalysis);
+            $aiAnalyzeBtn.textContent = '✦ Re-analyze';
+          }
+        }
+
+        // Recording (proxy via messageId)
+        const recProxyUrl = `/api/recording?messageId=${messageId}&locationId=${clientId}`;
+        $audioEl.src = recProxyUrl;
+        $audioEl.load();
+        $audioEl.addEventListener('loadedmetadata', () => {
+          $timeLabel.textContent = `0:00 / ${fmtDur($audioEl.duration)}`;
+        }, { once: true });
+
+        // Transcript
+        try {
+          const tPath = `/api/transcription?messageId=${messageId}&locationId=${clientId}`;
+          const tRes  = await apiFetch(tPath);
+          let text = '';
+          if (typeof tRes === 'string') {
+            text = tRes;
+          } else if (Array.isArray(tRes)) {
+            text = tRes.map(seg => seg.transcript || seg.text || '').join(' ');
+          } else {
+            text = tRes.transcript || tRes.text || '';
+          }
+          $transcriptText.textContent = text || 'No transcript text returned.';
+        } catch (e) {
+          $transcriptText.textContent = 'No transcript available for this call.';
+        }
+      } else {
+        $transcriptText.textContent = 'No call message found.';
+      }
+    } catch (err) {
+      console.error('[openCallDetail] error:', err);
+      $transcriptText.textContent = 'Error loading call data.';
+    }
   }
 
-  $audioEl.addEventListener('timeupdate', updateAudioProgress);
-  $audioEl.addEventListener('loadedmetadata', updateAudioProgress);
-  $audioEl.addEventListener('ended', () => { $playBtn.innerHTML = '&#9654;'; });
-
+  // ─── Audio Player ────────────────────────────────────────────────────────────
+  $playBtn.addEventListener('click', () => {
+    if ($audioEl.paused) { $audioEl.play(); $playBtn.textContent = '⏸'; }
+    else                 { $audioEl.pause(); $playBtn.textContent = '▶'; }
+  });
+  $audioEl.addEventListener('ended', () => { $playBtn.textContent = '▶'; });
+  $audioEl.addEventListener('timeupdate', () => {
+    const pct = $audioEl.duration ? ($audioEl.currentTime / $audioEl.duration) * 100 : 0;
+    $progressFill.style.width = pct + '%';
+    $timeLabel.textContent = `${fmtDur($audioEl.currentTime)} / ${fmtDur($audioEl.duration)}`;
+  });
   $progressWrap.addEventListener('click', e => {
-    if (!$audioEl.duration || isNaN($audioEl.duration) || !isFinite($audioEl.duration)) return;
+    if (!$audioEl.duration) return;
     const rect = $progressWrap.getBoundingClientRect();
-    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    $audioEl.currentTime = pct * $audioEl.duration;
+    $audioEl.currentTime = ((e.clientX - rect.left) / rect.width) * $audioEl.duration;
+  });
+  $closeDetailBtn.addEventListener('click', () => {
+    $callDetail.classList.add('hidden');
+    $audioEl.pause();
+    $callList.querySelectorAll('.call-row').forEach(r => r.classList.remove('active'));
   });
 
-  // ─── AI Analysis ─────────────────────────────────────────────────────────────
-  $aiAnalyzeBtn.addEventListener('click', async () => {
-    const transcript = $transcriptText.dataset.raw || $transcriptText.textContent;
-    if (!transcript || transcript === 'No transcript available') {
-      showError('No transcript available to analyze');
+  // ─── AI Analysis (Fix 2, 7) ──────────────────────────────────────────────────
+  $aiAnalyzeBtn.addEventListener('click', runAiAnalysis);
+
+  async function runAiAnalysis() {
+    const transcript = $transcriptText.textContent;
+    if (!transcript || transcript === 'No transcript available.' || transcript === 'Loading…') {
+      showError('No transcript to analyze.');
       return;
     }
-
-    const call = appData.calls.find(c => c.conversationId === currentCallConvId);
-    const repName = call ? (getRepName(call.userId) || 'Rep') : 'Rep';
-    const contactName = call ? (call.contactName || 'Lead') : 'Lead';
-
     $aiAnalyzeBtn.disabled = true;
     $aiAnalyzeBtn.textContent = '✦ Analyzing…';
-    $aiResults.innerHTML = '<div class="loading-row"><span class="spinner"></span> Analyzing call…</div>';
-    $aiResults.classList.remove('hidden');
+    $aiResults.classList.add('hidden');
+
+    const call = appData.calls.find(c => (c.conversationId || c.id) === currentCallConvId);
+    const repName = getRepName(currentCallRepId);
+    const contactName = call?.contactName || '';
 
     try {
       const result = await apiFetch('/api/ai-analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript, repName, contactName }),
+        body: JSON.stringify({
+          transcript,
+          repName,
+          contactName,
+          repId: currentCallRepId,
+        }),
       });
 
-      renderAiResults(result, transcript);
+      renderAiResults(result);
+      $aiAnalyzeBtn.textContent = '✦ Re-analyze';
+
+      // Fix 7: Save to call-notes
+      if (currentMessageId) {
+        const savePayload = {
+          conversationId: currentCallConvId,
+          aiAnalysis: result,
+          aiAnalyzedAt: new Date().toISOString(),
+        };
+        await apiFetch(`/api/call-notes/${currentMessageId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(savePayload),
+        }).catch(err => console.warn('[ai-cache] save error:', err));
+
+        // Update local cache
+        if (!appData.callNotes[currentMessageId]) appData.callNotes[currentMessageId] = {};
+        Object.assign(appData.callNotes[currentMessageId], savePayload);
+        if (currentCallConvId) {
+          appData.notesByConvId[currentCallConvId] = {
+            ...appData.callNotes[currentMessageId],
+            messageId: currentMessageId,
+          };
+        }
+
+        // Refresh call row badge
+        const row = $callList.querySelector(`[data-conv-id="${currentCallConvId}"]`);
+        if (row) {
+          const newRow = document.createElement('div');
+          newRow.innerHTML = buildCallRow(appData.calls.find(c => (c.conversationId || c.id) === currentCallConvId));
+          row.replaceWith(newRow.firstElementChild);
+        }
+      }
     } catch (err) {
-      $aiResults.innerHTML = `<div class="empty-state">AI analysis failed: ${escHtml(err.message)}</div>`;
+      showError('AI analysis failed: ' + err.message);
+      $aiAnalyzeBtn.textContent = '✦ Analyze with AI';
     } finally {
       $aiAnalyzeBtn.disabled = false;
-      $aiAnalyzeBtn.textContent = '✦ Re-analyze';
     }
-  });
+  }
 
-  function renderAiResults(data, rawTranscript) {
-    if (!data) { $aiResults.innerHTML = emptyState('No results'); return; }
+  // Fix 2: After AI results load, hide plain transcript
+  function renderAiResults(data) {
+    if (!data) return;
+    const score = data.score || 0;
+    const scoreColor = score >= 8 ? '#00f5a0' : score >= 6 ? '#f5a623' : '#ff4d4f';
 
-    const scoreHtml = data.score != null
-      ? `<div class="ai-score-badge">Score: ${data.score}/10</div>`
-      : '';
+    let html = `
+      <div class="ai-score-row">
+        <span class="ai-score" style="color:${scoreColor}">${score}/10</span>
+        <span class="ai-score-label">AI Score</span>
+      </div>
+      <div class="ai-summary">${data.summary || ''}</div>
+    `;
 
-    const summaryHtml = data.summary
-      ? `<div class="ai-card"><div class="ai-card-label">Summary</div><div class="ai-card-body">${escHtml(data.summary)}</div></div>`
-      : '';
+    if (data.keyMoments?.length) {
+      html += `<div class="ai-sub-label">Key Moments</div>`;
+      html += `<div class="ai-moments">` + data.keyMoments.map(m =>
+        `<div class="ai-moment"><span class="ai-moment-type">${m.type}</span> ${m.description}</div>`
+      ).join('') + `</div>`;
+    }
 
-    const momentsHtml = Array.isArray(data.keyMoments) && data.keyMoments.length > 0
-      ? `<div class="ai-card">
-          <div class="ai-card-label">Key Moments</div>
-          ${data.keyMoments.map(m => `
-            <div class="ai-moment">
-              <span class="ai-moment-type">${escHtml(m.type || '')}</span>
-              <span>${escHtml(m.description || m.text || String(m))}</span>
-            </div>`).join('')}
-        </div>`
-      : '';
+    if (data.coachingTip) {
+      html += `<div class="ai-sub-label">Coaching Tip</div>
+               <div class="ai-coaching">${data.coachingTip}</div>`;
+    }
 
-    const coachHtml = data.coachingTip
-      ? `<div class="ai-card"><div class="ai-card-label">Coaching Tip</div><div class="ai-card-body">${escHtml(data.coachingTip)}</div></div>`
-      : '';
+    if (data.labeledTranscript?.length) {
+      html += `<div class="ai-sub-label">Labeled Transcript</div>
+               <div class="ai-transcript">` +
+        data.labeledTranscript.map(seg =>
+          `<div class="ai-seg ai-seg-${seg.speaker === 'Rep' ? 'rep' : 'lead'}">
+             <span class="ai-seg-label">${seg.speaker}</span>
+             <span class="ai-seg-text">${seg.text}</span>
+           </div>`
+        ).join('') + `</div>`;
+    }
 
-    const transcriptHtml = data.labeledTranscript
-      ? `<div class="ai-card">
-          <div class="ai-card-label">Labeled Transcript</div>
-          <div class="transcript-labeled">${data.labeledTranscript.map(seg => `
-            <div><span class="${seg.speaker === 'Rep' ? 'transcript-rep' : 'transcript-lead'}">${escHtml(seg.speaker)}: </span>${escHtml(seg.text)}</div>
-          `).join('')}</div>
-        </div>`
-      : '';
-
-    $aiResults.innerHTML = `${scoreHtml}${summaryHtml}${momentsHtml}${coachHtml}${transcriptHtml}`;
+    $aiResults.innerHTML = html;
+    $aiResults.classList.remove('hidden');
+    // Fix 2: Hide plain transcript once AI analysis renders
+    $transcriptSection.classList.add('hidden');
   }
 
   // ─── Manager Notes ────────────────────────────────────────────────────────────
   $saveNoteBtn.addEventListener('click', async () => {
-    if (!currentMessageId) { showError('No call selected'); return; }
-    $saveNoteBtn.disabled = true;
-    $saveNoteBtn.textContent = 'Saving…';
+    if (!currentMessageId && !currentCallConvId) return;
+    const note    = $managerNoteText.value.trim();
+    const flagged = $flagToggle.checked;
+
     try {
-      await apiFetch(`/api/call-notes/${encodeURIComponent(currentMessageId)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ note: $managerNoteText.value, flagged: $flagToggle.checked }),
-      });
-      $existingNote.innerHTML = `
-        <div>${escHtml($managerNoteText.value)}</div>
-        <div class="existing-note-meta">Saved just now</div>
-      `;
-      $existingNote.classList.remove('hidden');
-      $saveNoteBtn.textContent = 'Saved ✓';
-      setTimeout(() => { $saveNoteBtn.textContent = 'Save Note'; $saveNoteBtn.disabled = false; }, 2000);
+      if (currentMessageId) {
+        await apiFetch(`/api/call-notes/${currentMessageId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ note, flagged, conversationId: currentCallConvId }),
+        });
+        if (!appData.callNotes[currentMessageId]) appData.callNotes[currentMessageId] = {};
+        Object.assign(appData.callNotes[currentMessageId], { note, flagged, conversationId: currentCallConvId });
+        if (currentCallConvId) {
+          if (!appData.notesByConvId[currentCallConvId]) appData.notesByConvId[currentCallConvId] = {};
+          Object.assign(appData.notesByConvId[currentCallConvId], { note, flagged, messageId: currentMessageId });
+        }
+      }
+      if (note) {
+        $existingNote.textContent = note;
+        $existingNote.classList.remove('hidden');
+      }
+      $saveNoteBtn.textContent = '✓ Saved';
+      setTimeout(() => { $saveNoteBtn.textContent = 'Save Note'; }, 2000);
+      renderCallLog();
     } catch (err) {
       showError('Failed to save note: ' + err.message);
-      $saveNoteBtn.textContent = 'Save Note';
-      $saveNoteBtn.disabled = false;
     }
   });
 
-  // ─── SMS Tab ─────────────────────────────────────────────────────────────────
-  function renderSmsTab() {
-    const search = ($smsSearch.value || '').toLowerCase().trim();
-    const clientId = $smsClientSelect.value;
-
-    let convos = appData.smsConvos.filter(c => {
-      if (clientId !== 'all' && c._clientId !== clientId) return false;
-      if (search) {
-        const name = (c.contactName || c.fullName || c.phone || '').toLowerCase();
-        if (!name.includes(search)) return false;
+  // ─── SMS / Conversations Tab ─────────────────────────────────────────────────
+  function getFilteredSms() {
+    const search = smsFilters.search.toLowerCase().trim();
+    return appData.smsConvos.filter(c => {
+      if (smsFilters.clientId !== 'all' && c.locationId !== smsFilters.clientId) return false;
+      if (search && !(c.contactName || c.phone || '').toLowerCase().includes(search)) return false;
+      if (smsFilters.outcome !== 'all') {
+        if (smsFilters.outcome === 'sold') {
+          if (!appData.contactWonSet.has(c.contactId)) return false;
+        } else if (smsFilters.outcome === 'pipeline') {
+          if (appData.contactWonSet.has(c.contactId)) return false;
+          if (!appData.allContactOppMap[c.contactId]?.length) return false;
+        }
       }
       return true;
     });
+  }
 
-    convos.sort((a, b) => {
-      const da = parseDate(a.lastMessageDate), db = parseDate(b.lastMessageDate);
-      if (!da && !db) return 0; if (!da) return 1; if (!db) return -1;
-      return db - da;
-    });
+  function renderSmsList() {
+    const convos = getFilteredSms();
+    $smsCount.textContent = `${convos.length} conversations`;
 
-    $smsCount.textContent = convos.length ? `${convos.length} conversations` : '';
-
-    if (convos.length === 0) {
-      $smsList.innerHTML = emptyState('No SMS conversations found');
+    if (!convos.length) {
+      $smsList.innerHTML = '<div class="empty-state">No SMS conversations found.</div>';
       return;
     }
 
+    const sold = appData.contactWonSet;
+
     $smsList.innerHTML = convos.map(c => {
-      const name = c.contactName || c.fullName || c.phone || 'Unknown';
-      const preview = c.lastMessage || c.lastMessageBody || '';
-      const dateStr = formatDate(c.lastMessageDate);
+      const d = parseDate(c.dateUpdated || c.lastMessageDate);
+      const dateStr = d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+      const isSold = sold.has(c.contactId);
+      const hasOpp = !!appData.allContactOppMap[c.contactId]?.length;
+
       return `
-        <div class="sms-row" data-conv-id="${escHtml(c.id)}" data-client-id="${escHtml(c._clientId)}">
-          <div class="call-info">
-            <div class="sms-contact">${escHtml(name)}</div>
-            <div class="sms-preview">${escHtml(preview)}</div>
+        <div class="call-row" data-conv-id="${c.id}" data-location-id="${c.locationId}">
+          <div class="call-dir-icon dir-sms">💬</div>
+          <div class="call-row-main">
+            <div class="call-row-top">
+              <span class="call-contact">${c.contactName || c.phone || 'Unknown'}</span>
+              <div class="sms-badges">
+                ${isSold ? '<span class="badge badge-sold">Sold</span>' : ''}
+                ${!isSold && hasOpp ? '<span class="badge badge-pipeline">Pipeline</span>' : ''}
+              </div>
+            </div>
+            <div class="call-row-sub">
+              <span>${getClientName(c.locationId)}</span>
+              ${c.lastMessageBody ? `<span class="sms-preview">${c.lastMessageBody.slice(0, 60)}…</span>` : ''}
+              ${dateStr ? `<span>${dateStr}</span>` : ''}
+            </div>
           </div>
-          <div class="sms-date">${dateStr}</div>
-        </div>`;
+          <svg class="call-chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+        </div>
+      `;
     }).join('');
 
-    $smsList.querySelectorAll('.sms-row').forEach(row => {
+    $smsList.querySelectorAll('.call-row').forEach(row => {
       row.addEventListener('click', () => {
-        $smsList.querySelectorAll('.sms-row').forEach(r => r.classList.remove('active'));
+        $smsList.querySelectorAll('.call-row').forEach(r => r.classList.remove('active'));
         row.classList.add('active');
-        openSmsThread(row.dataset.convId, row.dataset.clientId);
+        openSmsThread(row.dataset.convId, row.dataset.locationId);
       });
     });
   }
 
-  async function openSmsThread(convId, clientId) {
+  async function openSmsThread(convId, locId) {
     $smsThreadPanel.classList.remove('hidden');
-    $smsThreadMessages.innerHTML = '<div class="loading-row"><span class="spinner"></span> Loading…</div>';
-
-    const convo = appData.smsConvos.find(c => c.id === convId);
-    const name = convo ? (convo.contactName || convo.fullName || convo.phone || 'Conversation') : 'Conversation';
-    $smsThreadContact.textContent = name;
+    $smsThreadContact.textContent = 'Loading…';
+    $smsThreadMessages.innerHTML = '<div class="empty-state">Loading…</div>';
 
     try {
-      const data = await apiFetch(`/api/conversations/${encodeURIComponent(convId)}/thread?locationId=${encodeURIComponent(clientId)}`);
-      const messages = Array.isArray(data.messages) ? data.messages : [];
-      if (messages.length === 0) {
-        $smsThreadMessages.innerHTML = emptyState('No messages in this conversation');
+      const data = await apiFetch(`/api/conversations/${convId}/thread?locationId=${locId}`);
+      const messages = data?.messages?.messages || data?.messages || [];
+      const convo = appData.smsConvos.find(c => c.id === convId);
+      $smsThreadContact.textContent = convo?.contactName || convo?.phone || 'Conversation';
+
+      if (!messages.length) {
+        $smsThreadMessages.innerHTML = '<div class="empty-state">No messages in thread.</div>';
         return;
       }
+
       $smsThreadMessages.innerHTML = messages.map(m => {
-        const dir = (m.direction || '').toLowerCase().includes('out') ? 'outbound' : 'inbound';
-        const body = m.body || m.message || m.text || '';
-        const time = m.dateAdded || m.createdAt;
+        const isOut = m.direction === 'outbound' || m.direction === 'Outbound';
+        const d = parseDate(m.dateAdded || m.createdAt);
+        const timeStr = d ? d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
         return `
-          <div class="sms-bubble ${dir}">
-            <div>${escHtml(body)}</div>
-            ${time ? `<div class="sms-bubble-time">${formatDate(time)}</div>` : ''}
-          </div>`;
+          <div class="sms-msg sms-msg-${isOut ? 'out' : 'in'}">
+            <div class="sms-bubble">${m.body || m.text || ''}</div>
+            <div class="sms-time">${timeStr}</div>
+          </div>
+        `;
       }).join('');
+
       $smsThreadMessages.scrollTop = $smsThreadMessages.scrollHeight;
     } catch (err) {
-      $smsThreadMessages.innerHTML = emptyState('Failed to load thread: ' + err.message);
+      $smsThreadMessages.innerHTML = `<div class="empty-state">Failed to load: ${err.message}</div>`;
     }
   }
 
-  // ─── Weekly SPIFF ────────────────────────────────────────────────────────────
-  function renderSpiff() {
-    const offsetWeeks = parseInt($spiffWeekSelect.value || '0', 10);
-    const { start, end } = getWeekBounds(offsetWeeks);
-    $spiffBannerRange.textContent = formatWeekLabel(start, end);
+  $closeSmsBtn.addEventListener('click', () => {
+    $smsThreadPanel.classList.add('hidden');
+    $smsList.querySelectorAll('.call-row').forEach(r => r.classList.remove('active'));
+  });
 
-    const reps = appData.config.reps || [];
-    if (reps.length === 0) {
-      $spiffLbList.innerHTML = emptyState('Add reps to reps-config.json to see SPIFF rankings');
-      return;
+  // ─── SPIFF Tab (Fix 1) ───────────────────────────────────────────────────────
+  function buildSpiffWeekOptions() {
+    while ($spiffWeekSelect.options.length) $spiffWeekSelect.remove(0);
+
+    const now = new Date();
+    const day = now.getDay(); // 0=Sun
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - ((day + 6) % 7));
+    monday.setHours(0, 0, 0, 0);
+
+    for (let w = 0; w < 8; w++) {
+      const start = new Date(monday);
+      start.setDate(monday.getDate() - w * 7);
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
+
+      const label = w === 0
+        ? `Current Week (${fmtWeekLabel(start, end)})`
+        : fmtWeekLabel(start, end);
+      $spiffWeekSelect.add(new Option(label, start.toISOString()));
     }
+  }
 
-    const weekOpps = appData.opportunities.filter(o => {
-      const d = parseDate(o.dateAdded || o.createdAt || o.dateUpdated);
+  function fmtWeekLabel(start, end) {
+    const opts = { month: 'short', day: 'numeric' };
+    return `${start.toLocaleDateString('en-US', opts)} – ${end.toLocaleDateString('en-US', opts)}`;
+  }
+
+  function renderSpiff() {
+    const val = $spiffWeekSelect.value;
+    const start = val ? new Date(val) : (() => {
+      const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); d.setHours(0,0,0,0); return d;
+    })();
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+
+    $spiffBannerRange.textContent = fmtWeekLabel(start, end);
+
+    // Fix 1: Filter by lastStageChangeAt (win date) not dateAdded
+    const weekWonOpps = appData.opportunities.filter(o => {
+      const d = getWonDate(o);
       return d && d >= start && d <= end;
     });
 
-    const stats = reps.map(rep => {
-      const repOpps = weekOpps.filter(o => o.assignedTo === rep.id);
-      const sold = repOpps.filter(o => (o.status || '').toLowerCase() === 'won').length;
-      const revenue = repOpps
-        .filter(o => (o.status || '').toLowerCase() === 'won')
-        .reduce((s, o) => s + parseFloat(o.monetaryValue || o.value || 0), 0);
-      const weekCalls = appData.calls.filter(c => {
+    const reps = appData.config.reps;
+    const rows = reps.map(r => {
+      const rWon  = weekWonOpps.filter(o => o.assignedTo === r.userId);
+      const sold  = rWon.length;
+      const rev   = rWon.reduce((s, o) => s + (o.monetaryValue || 0), 0);
+      const calls = appData.calls.filter(c => {
+        if (c.userId !== r.userId) return false;
         const d = parseDate(c.dateAdded);
-        return c.userId === rep.id && d && d >= start && d <= end;
+        return d && d >= start && d <= end;
       }).length;
-      return { rep, sold, revenue, calls: weekCalls };
-    });
+      return { rep: r, sold, rev, calls };
+    }).filter(r => r.sold > 0 || r.calls > 0);
 
-    stats.sort((a, b) => b.sold - a.sold);
+    rows.sort((a, b) => b.sold - a.sold || b.rev - a.rev);
 
-    $spiffLbList.innerHTML = stats.map(({ rep, sold, revenue, calls }, i) => {
-      const rank = i + 1;
-      const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
-      const crown = rank === 1 ? '<span class="spiff-crown">👑</span>' : '';
+    if (!rows.length) {
+      $spiffLbList.innerHTML = '<div class="empty-state">No activity found for this week.</div>';
+      return;
+    }
+
+    $spiffLbList.innerHTML = rows.map((row, i) => {
+      const crown = i === 0 && row.sold > 0 ? ' 👑' : '';
       return `
-        <div class="lb-row" style="${rank === 1 ? 'background:rgba(0,245,160,0.06)' : ''}">
-          <div class="lb-rank ${rankClass}">${rank}</div>
-          <div class="lb-avatar">${initials(rep.name)}</div>
+        <div class="lb-row spiff-row" data-rep-id="${row.rep.userId}">
+          <span class="lb-rank spiff-rank">${i + 1}${crown}</span>
+          <div class="lb-avatar">${initials(row.rep.name)}</div>
           <div class="lb-info">
-            <div class="lb-name">${crown}${escHtml(rep.name)}</div>
-            <div class="lb-sub">${calls} calls &middot; ${formatCurrency(revenue)} revenue</div>
+            <div class="lb-name">${row.rep.name}</div>
+            <div class="lb-sub">${row.calls} calls this week</div>
           </div>
-          <div style="text-align:right">
-            <div class="spiff-sold-big">${sold}</div>
-            <div class="spiff-sold-label">sold</div>
+          <div class="lb-right">
+            <div class="lb-val">${row.sold}</div>
+            <div class="lb-sub">${fmt$(row.rev)}</div>
           </div>
-        </div>`;
+        </div>
+      `;
     }).join('');
+
+    $spiffLbList.querySelectorAll('.spiff-row[data-rep-id]').forEach(row => {
+      row.addEventListener('click', () => openRepProfile(row.dataset.repId));
+    });
   }
 
-  // ─── Event Listeners ─────────────────────────────────────────────────────────
+  // ─── Settings Panel (Fix 6) ──────────────────────────────────────────────────
+  function openSettings() {
+    $settingsPanel.classList.remove('hidden');
+    $settingsOverlay.classList.remove('hidden');
+  }
+  function closeSettings() {
+    $settingsPanel.classList.add('hidden');
+    $settingsOverlay.classList.add('hidden');
+  }
+
+  function populateRubricEditor() {
+    const rubric = appData.scoringRubric;
+    $rubricDefaultText.value = rubric.default || '';
+    const repId = $rubricRepSelect.value;
+    $rubricOverrideText.value = repId ? (rubric.repOverrides?.[repId] || '') : '';
+  }
+
+  $settingsBtn.addEventListener('click', openSettings);
+  $settingsClose.addEventListener('click', closeSettings);
+  $settingsOverlay.addEventListener('click', closeSettings);
+
+  $rubricRepSelect.addEventListener('change', () => {
+    const repId = $rubricRepSelect.value;
+    $rubricOverrideText.value = repId ? (appData.scoringRubric.repOverrides?.[repId] || '') : '';
+  });
+
+  $saveRubricBtn.addEventListener('click', async () => {
+    try {
+      $saveRubricBtn.textContent = 'Saving…';
+      const updated = { ...appData.scoringRubric, default: $rubricDefaultText.value };
+      await apiFetch('/api/scoring-rubric', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ default: updated.default }),
+      });
+      appData.scoringRubric.default = updated.default;
+      $saveRubricBtn.textContent = '✓ Saved';
+      setTimeout(() => { $saveRubricBtn.textContent = 'Save Rubric'; }, 2000);
+    } catch (err) {
+      showError('Failed to save rubric: ' + err.message);
+      $saveRubricBtn.textContent = 'Save Rubric';
+    }
+  });
+
+  $saveRepOverrideBtn.addEventListener('click', async () => {
+    const repId = $rubricRepSelect.value;
+    if (!repId) { showError('Select a rep first.'); return; }
+    try {
+      $saveRepOverrideBtn.textContent = 'Saving…';
+      const overrides = { ...(appData.scoringRubric.repOverrides || {}), [repId]: $rubricOverrideText.value };
+      await apiFetch('/api/scoring-rubric', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repOverrides: overrides }),
+      });
+      appData.scoringRubric.repOverrides = overrides;
+      $saveRepOverrideBtn.textContent = '✓ Saved';
+      setTimeout(() => { $saveRepOverrideBtn.textContent = 'Save Rep Override'; }, 2000);
+    } catch (err) {
+      showError('Failed to save override: ' + err.message);
+      $saveRepOverrideBtn.textContent = 'Save Rep Override';
+    }
+  });
+
+  // ─── Rep Profile Modal (Fix 4) ────────────────────────────────────────────────
+  function openRepProfile(repId) {
+    const rep = getRepById(repId);
+    if (!rep) return;
+    currentProfileRepId = repId;
+
+    $repModalAvatar.textContent = initials(rep.name);
+    $repModalName.textContent = rep.name;
+
+    // Stats across all calls/opps
+    const repOpps  = appData.opportunities.filter(o => o.assignedTo === repId);
+    const repWon   = repOpps.filter(o => (o.status || '').toLowerCase() === 'won');
+    const repCalls = appData.calls.filter(c => c.userId === repId);
+    const talkSec  = repCalls.reduce((s, c) => s + getCallDuration(c), 0);
+    const sold     = repWon.length;
+    const rev      = repWon.reduce((s, o) => s + (o.monetaryValue || 0), 0);
+    const rate     = repCalls.length ? ((sold / repCalls.length) * 100).toFixed(1) + '%' : '—';
+    const smsCount = appData.smsConvos.filter(c => c.assignedTo === repId).length;
+
+    // Avg AI score
+    const aiScores = repCalls
+      .map(c => appData.notesByConvId[c.conversationId || c.id]?.aiAnalysis?.score)
+      .filter(s => s != null);
+    const avgAi = aiScores.length ? (aiScores.reduce((a, b) => a + b, 0) / aiScores.length).toFixed(1) : '—';
+
+    $repModalSub.textContent = `${smsCount} SMS conversations`;
+
+    $repModalStats.innerHTML = `
+      <div class="rep-modal-stat"><div class="rep-modal-stat-val">${sold}</div><div class="rep-modal-stat-lbl">Sold</div></div>
+      <div class="rep-modal-stat"><div class="rep-modal-stat-val">${fmt$(rev)}</div><div class="rep-modal-stat-lbl">Revenue</div></div>
+      <div class="rep-modal-stat"><div class="rep-modal-stat-val">${repCalls.length}</div><div class="rep-modal-stat-lbl">Calls</div></div>
+      <div class="rep-modal-stat"><div class="rep-modal-stat-val">${fmtDurLong(talkSec)}</div><div class="rep-modal-stat-lbl">Talk Time</div></div>
+      <div class="rep-modal-stat"><div class="rep-modal-stat-val">${rate}</div><div class="rep-modal-stat-lbl">Close Rate</div></div>
+      <div class="rep-modal-stat"><div class="rep-modal-stat-val" style="color:${avgAi !== '—' ? '#00f5a0' : 'inherit'}">${avgAi}</div><div class="rep-modal-stat-lbl">Avg AI</div></div>
+    `;
+
+    // Top 3 AI-scored calls
+    const scoredCalls = repCalls
+      .map(c => {
+        const note = appData.notesByConvId[c.conversationId || c.id];
+        return { call: c, score: note?.aiAnalysis?.score };
+      })
+      .filter(x => x.score != null)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+
+    $repModalTopCalls.innerHTML = scoredCalls.length
+      ? scoredCalls.map(x => miniCallRow(x.call, x.score)).join('')
+      : '<div class="empty-state" style="padding:12px 16px;font-size:12px">No analyzed calls yet.</div>';
+
+    // Recent 10 calls
+    const recent = [...repCalls].sort((a, b) => {
+      const da = parseDate(a.dateAdded), db = parseDate(b.dateAdded);
+      return (db || 0) - (da || 0);
+    }).slice(0, 10);
+    $repModalAllCalls.innerHTML = recent.length
+      ? recent.map(c => miniCallRow(c)).join('')
+      : '<div class="empty-state" style="padding:12px 16px;font-size:12px">No calls found.</div>';
+
+    $repProfileModal.classList.remove('hidden');
+    $repModalOverlay.classList.remove('hidden');
+    bindMiniCallRows($repModalTopCalls);
+    bindMiniCallRows($repModalAllCalls);
+  }
+
+  function miniCallRow(c, aiScore) {
+    const dir    = getCallDir(c);
+    const dur    = getCallDuration(c);
+    const d      = parseDate(c.dateAdded);
+    const dateStr = d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+    const convId = c.conversationId || c.id;
+    return `
+      <div class="call-row" style="padding:8px 16px" data-conv-id="${convId}" data-client-id="${c._clientId}">
+        <div class="call-dir-icon ${dir === 'inbound' ? 'dir-in' : dir === 'missed' ? 'dir-missed' : 'dir-out'}" style="width:20px;height:20px;font-size:10px">
+          ${dir === 'inbound' ? '↙' : '↗'}
+        </div>
+        <div class="call-row-main">
+          <div class="call-row-top" style="font-size:12px">${c.contactName || c.phone || 'Unknown'}</div>
+          <div class="call-row-sub">
+            <span>${getClientName(c._clientId)}</span>
+            ${dur ? `<span>${fmtDur(dur)}</span>` : ''}
+            ${dateStr ? `<span>${dateStr}</span>` : ''}
+            ${aiScore != null ? `<span class="badge badge-ai">AI ${aiScore}/10</span>` : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function closeRepProfile() {
+    $repProfileModal.classList.add('hidden');
+    $repModalOverlay.classList.add('hidden');
+    currentProfileRepId = null;
+  }
+
+  $repModalClose.addEventListener('click', closeRepProfile);
+  $repModalOverlay.addEventListener('click', closeRepProfile);
+
+  $repModalViewBtn.addEventListener('click', () => {
+    if (!currentProfileRepId) return;
+    closeRepProfile();
+    // Switch to Calls tab and filter by rep
+    callFilters.repId = currentProfileRepId;
+    $callsRepSelect.value = currentProfileRepId;
+    switchTab('calls');
+    renderCallLog();
+  });
+
+  // Click on mini call row in rep modal → open call detail
+  function bindMiniCallRows(container) {
+    container.querySelectorAll('.call-row[data-conv-id]').forEach(row => {
+      row.addEventListener('click', () => {
+        closeRepProfile();
+        switchTab('calls');
+        openCallDetail(row.dataset.convId, row.dataset.clientId, row);
+      });
+    });
+  }
+
+  // ─── Tab Navigation ──────────────────────────────────────────────────────────
+  function switchTab(name) {
+    activeTab = name;
+    $navTabs.forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+    document.querySelectorAll('.tab-section').forEach(s => {
+      s.classList.toggle('active', s.id === `tab-${name}`);
+      s.classList.toggle('hidden', s.id !== `tab-${name}`);
+    });
+  }
+
   $navTabs.forEach(tab => {
     tab.addEventListener('click', () => switchTab(tab.dataset.tab));
   });
 
-  $refreshBtn.addEventListener('click', () => {
-    closeCallDetail();
-    fetchAll();
-  });
-
-  // Command Center filters
-  $ccClientSelect.addEventListener('change', () => {
-    filters.clientId = $ccClientSelect.value;
-    filters.pipelineId = 'all';
-    filters.repId = null;
-    populateCCLocationDropdown();
-    closeCallDetail();
-    renderAll();
-  });
-  $ccLocationSelect.addEventListener('change', () => {
-    filters.pipelineId = $ccLocationSelect.value;
-    filters.repId = null;
-    closeCallDetail();
-    renderAll();
-  });
-  $ccDateSelect.addEventListener('change', () => {
-    filters.days = parseInt($ccDateSelect.value, 10);
-    closeCallDetail();
-    renderAll();
-  });
-
-  // Calls tab filters
+  // ─── Call Filter Controls ────────────────────────────────────────────────────
   $callsSearch.addEventListener('input', () => {
-    filters.callSearch = $callsSearch.value;
-    const calls = filteredCalls();
-    const opps = filteredOpps();
-    renderCallLog(calls, buildContactOppMap(opps));
+    callFilters.search = $callsSearch.value;
+    renderCallLog();
   });
+
   $callsRepSelect.addEventListener('change', () => {
-    filters.repId = $callsRepSelect.value === 'all' ? null : $callsRepSelect.value;
-    const calls = filteredCalls();
-    const opps = filteredOpps();
-    renderCallLog(calls, buildContactOppMap(opps));
-    closeCallDetail();
+    callFilters.repId = $callsRepSelect.value === 'all' ? null : $callsRepSelect.value;
+    renderCallLog();
   });
+
   $callsClientSelect.addEventListener('change', () => {
-    filters.clientId = $callsClientSelect.value;
-    const calls = filteredCalls();
-    const opps = filteredOpps();
-    renderCallLog(calls, buildContactOppMap(opps));
-    closeCallDetail();
+    callFilters.clientId = $callsClientSelect.value;
+    renderCallLog();
   });
+
   $callsDateSelect.addEventListener('change', () => {
-    filters.callsDays = parseInt($callsDateSelect.value, 10);
-    filters.days = filters.callsDays;
-    const calls = filteredCalls();
-    const opps = filteredOpps();
-    renderCallLog(calls, buildContactOppMap(opps));
-    closeCallDetail();
+    const val = $callsDateSelect.value;
+    if (val === 'custom') {
+      $customDateInputs.classList.remove('hidden');
+      callFilters.fromDate = null;
+      callFilters.toDate   = null;
+    } else {
+      $customDateInputs.classList.add('hidden');
+      callFilters.days      = parseInt(val, 10);
+      callFilters.fromDate  = null;
+      callFilters.toDate    = null;
+    }
+    renderCallLog();
+  });
+
+  $callsFromDate.addEventListener('change', () => {
+    callFilters.fromDate = $callsFromDate.value ? new Date($callsFromDate.value + 'T00:00:00') : null;
+    renderCallLog();
+  });
+
+  $callsToDate.addEventListener('change', () => {
+    callFilters.toDate = $callsToDate.value ? new Date($callsToDate.value + 'T23:59:59') : null;
+    renderCallLog();
   });
 
   $dirTabs.addEventListener('click', e => {
-    const tab = e.target.closest('.dtab');
-    if (!tab) return;
-    filters.callDir = tab.dataset.dir;
-    $dirTabs.querySelectorAll('.dtab').forEach(t => t.classList.toggle('active', t.dataset.dir === filters.callDir));
-    const calls = filteredCalls();
-    const opps = filteredOpps();
-    renderCallLog(calls, buildContactOppMap(opps));
+    const btn = e.target.closest('.dtab');
+    if (!btn) return;
+    $dirTabs.querySelectorAll('.dtab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    callFilters.dir = btn.dataset.dir;
+    renderCallLog();
   });
 
-  $repSort.addEventListener('change', () => { renderRepLeaderboard(filteredOpps(), filteredCalls()); });
-  $clientSort.addEventListener('change', () => { renderClientLeaderboard(filteredOpps(), filteredCalls()); });
-
-  $closeDetailBtn.addEventListener('click', closeCallDetail);
-  $closeSmsBtn.addEventListener('click', () => {
-    $smsThreadPanel.classList.add('hidden');
-    $smsList.querySelectorAll('.sms-row').forEach(r => r.classList.remove('active'));
+  $callsOutcomeSelect.addEventListener('change', () => {
+    callFilters.outcome = $callsOutcomeSelect.value;
+    renderCallLog();
   });
 
-  $smsSearch.addEventListener('input', renderSmsTab);
-  $smsClientSelect.addEventListener('change', renderSmsTab);
+  $callsMinDurSelect.addEventListener('change', () => {
+    callFilters.minDuration = parseInt($callsMinDurSelect.value, 10) || 0;
+    renderCallLog();
+  });
+
+  $callsAiScoreSelect.addEventListener('change', () => {
+    callFilters.minAiScore = parseInt($callsAiScoreSelect.value, 10) || 0;
+    renderCallLog();
+  });
+
+  $callsFlaggedToggle.addEventListener('change', () => {
+    callFilters.flaggedOnly = $callsFlaggedToggle.checked;
+    renderCallLog();
+  });
+
+  $clearFiltersBtn.addEventListener('click', clearAllCallFilters);
+
+  // ─── CC Filter Controls ──────────────────────────────────────────────────────
+  $ccClientSelect.addEventListener('change', () => {
+    ccFilters.clientId = $ccClientSelect.value;
+    renderCommandCenter();
+  });
+
+  $ccLocationSelect.addEventListener('change', () => {
+    ccFilters.pipelineId = $ccLocationSelect.value;
+    renderCommandCenter();
+  });
+
+  $ccDateSelect.addEventListener('change', () => {
+    ccFilters.days = parseInt($ccDateSelect.value, 10);
+    renderCommandCenter();
+  });
+
+  $repSort.addEventListener('change', () => renderCommandCenter());
+  $clientSort.addEventListener('change', () => renderCommandCenter());
+
+  // ─── SMS Filter Controls ─────────────────────────────────────────────────────
+  $smsSearch.addEventListener('input', () => {
+    smsFilters.search = $smsSearch.value;
+    renderSmsList();
+  });
+
+  $smsClientSelect.addEventListener('change', () => {
+    smsFilters.clientId = $smsClientSelect.value;
+    renderSmsList();
+  });
+
+  $smsOutcomeSelect.addEventListener('change', () => {
+    smsFilters.outcome = $smsOutcomeSelect.value;
+    renderSmsList();
+  });
+
+  // ─── SPIFF Controls ──────────────────────────────────────────────────────────
   $spiffWeekSelect.addEventListener('change', renderSpiff);
+
+  // ─── Refresh ─────────────────────────────────────────────────────────────────
+  $refreshBtn.addEventListener('click', () => {
+    Object.keys(callsCache).forEach(k => delete callsCache[k]);
+    fetchAll();
+  });
 
   // ─── Init ────────────────────────────────────────────────────────────────────
   fetchAll();

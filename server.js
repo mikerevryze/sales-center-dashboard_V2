@@ -15,6 +15,26 @@ const AGENCY_KEY = process.env.GHL_AGENCY_API_KEY;
 const CLIENTS_CONFIG = path.join(__dirname, 'clients-config.json');
 const REPS_CONFIG = path.join(__dirname, 'reps-config.json');
 const CALL_NOTES_FILE = path.join(__dirname, 'call-notes.json');
+const SCORING_RUBRIC_FILE = path.join(__dirname, 'scoring-rubric.json');
+
+const DEFAULT_RUBRIC = `You are a sales call analyst for Revryze, a franchise presale membership company. Score this call out of 10 based on:
+- Opening (1pt): Did the rep introduce themselves clearly and professionally?
+- Discovery (2pts): Did they ask about the prospect's goals, timeline, and situation?
+- Pitch (2pts): Did they clearly explain the founding membership value and urgency?
+- Objection Handling (2pts): Did they address concerns effectively and pivot to value?
+- Close Attempt (2pts): Did they ask for the sale, set a next step, or book an appointment?
+- Professionalism (1pt): Was the call respectful, energetic, and well-paced?
+Deduct points for: excessive filler words, talking over the prospect, ignoring objections, no close attempt.`;
+
+async function loadScoringRubric() {
+  const exists = await fse.pathExists(SCORING_RUBRIC_FILE);
+  if (!exists) {
+    const defaults = { default: DEFAULT_RUBRIC, repOverrides: {} };
+    await fse.writeJson(SCORING_RUBRIC_FILE, defaults, { spaces: 2 });
+    return defaults;
+  }
+  return fse.readJson(SCORING_RUBRIC_FILE);
+}
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -654,6 +674,19 @@ app.get('/api/debug/recording', async (req, res) => {
   }
 });
 
+// ─── GET /api/call-notes (all) ───────────────────────────────────────────────
+app.get('/api/call-notes', async (req, res) => {
+  try {
+    const exists = await fse.pathExists(CALL_NOTES_FILE);
+    if (!exists) return res.json({});
+    const notes = await fse.readJson(CALL_NOTES_FILE);
+    res.json(notes);
+  } catch (err) {
+    console.error('GET /api/call-notes (all) error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── GET /api/call-notes/:messageId ─────────────────────────────────────────
 app.get('/api/call-notes/:messageId', async (req, res) => {
   try {
@@ -672,10 +705,17 @@ app.get('/api/call-notes/:messageId', async (req, res) => {
 app.post('/api/call-notes/:messageId', async (req, res) => {
   try {
     const { messageId } = req.params;
-    const { note, flagged } = req.body;
+    const { note, flagged, conversationId, aiAnalysis, aiAnalyzedAt } = req.body;
     const exists = await fse.pathExists(CALL_NOTES_FILE);
     const notes = exists ? await fse.readJson(CALL_NOTES_FILE) : {};
-    notes[messageId] = { note: note || '', flagged: !!flagged, savedAt: new Date().toISOString() };
+    const existing = notes[messageId] || {};
+    notes[messageId] = {
+      ...existing,
+      ...(note !== undefined ? { note, savedAt: new Date().toISOString() } : {}),
+      ...(flagged !== undefined ? { flagged: !!flagged } : {}),
+      ...(conversationId ? { conversationId } : {}),
+      ...(aiAnalysis ? { aiAnalysis, aiAnalyzedAt: aiAnalyzedAt || new Date().toISOString() } : {}),
+    };
     await fse.writeJson(CALL_NOTES_FILE, notes, { spaces: 2 });
     res.json({ ok: true });
   } catch (err) {
@@ -684,17 +724,50 @@ app.post('/api/call-notes/:messageId', async (req, res) => {
   }
 });
 
+// ─── GET /api/scoring-rubric ─────────────────────────────────────────────────
+app.get('/api/scoring-rubric', async (req, res) => {
+  try {
+    const rubric = await loadScoringRubric();
+    res.json(rubric);
+  } catch (err) {
+    console.error('GET /api/scoring-rubric error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── POST /api/scoring-rubric ────────────────────────────────────────────────
+app.post('/api/scoring-rubric', async (req, res) => {
+  try {
+    const { default: defaultRubric, repOverrides } = req.body;
+    const existing = await loadScoringRubric();
+    const updated = {
+      default: defaultRubric !== undefined ? defaultRubric : existing.default,
+      repOverrides: repOverrides !== undefined ? repOverrides : (existing.repOverrides || {}),
+    };
+    await fse.writeJson(SCORING_RUBRIC_FILE, updated, { spaces: 2 });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('POST /api/scoring-rubric error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── POST /api/ai-analyze ────────────────────────────────────────────────────
 app.post('/api/ai-analyze', async (req, res) => {
   try {
-    const { transcript, repName, contactName } = req.body;
+    const { transcript, repName, contactName, repId } = req.body;
     if (!transcript) return res.status(400).json({ error: 'transcript is required' });
 
     const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
     if (!ANTHROPIC_KEY) return res.status(503).json({ error: 'ANTHROPIC_API_KEY not configured' });
 
-    const systemPrompt = `You are an expert sales call coach analyzing outbound sales calls for a fitness/wellness company.
-You evaluate call quality, identify key moments, and provide actionable coaching feedback.
+    const rubric = await loadScoringRubric();
+    const rubricText = (repId && rubric.repOverrides && rubric.repOverrides[repId])
+      ? rubric.repOverrides[repId]
+      : (rubric.default || DEFAULT_RUBRIC);
+
+    const systemPrompt = `${rubricText}
+
 Respond ONLY with valid JSON in this exact structure:
 {
   "score": <integer 1-10>,
