@@ -288,6 +288,54 @@ app.get('/api/debug/callsonly/:locationId', async (req, res) => {
   }
 });
 
+// ─── GET /api/debug/findcalls/:locationId ────────────────────────────────────
+// Fetches 20 conversations, checks each for TYPE_CALL messages, returns only those with calls.
+app.get('/api/debug/findcalls/:locationId', async (req, res) => {
+  try {
+    const { locationId } = req.params;
+    const clientsData = await loadClientsConfig();
+    const client = findClient(clientsData.clients, locationId);
+    const apiKey = resolveLocationKey(client);
+    const headers = locationHeaders(apiKey);
+
+    // POST search for conversations
+    const searchRes = await fetch(`${GHL_API}/conversations/search`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId, limit: 20 }),
+    });
+    const searchData = await searchRes.json();
+    const conversations = searchData.conversations || searchData.data || [];
+
+    // For each conversation, fetch messages and look for call messages
+    const results = [];
+    for (const convo of conversations) {
+      const msgRes = await fetch(`${GHL_API}/conversations/${convo.id}/messages`, { headers });
+      const msgData = await msgRes.json();
+      const messages = msgData.messages || msgData.data || [];
+
+      const callMessages = messages.filter(m =>
+        m.messageType === 'TYPE_CALL' ||
+        m.type === 1 ||
+        (m.meta && m.meta.recordingUrl)
+      );
+
+      if (callMessages.length > 0) {
+        results.push({
+          conversationId: convo.id,
+          contactName: convo.contactName || convo.fullName || null,
+          callMessages,
+        });
+      }
+    }
+
+    res.json({ searched: conversations.length, withCalls: results.length, results });
+  } catch (err) {
+    console.error('GET /api/debug/findcalls error:', err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
 // ─── GET /api/debug/messages/:conversationId ─────────────────────────────────
 // Returns raw GHL messages response with no modification, for debugging field shape.
 app.get('/api/debug/messages/:conversationId', async (req, res) => {
