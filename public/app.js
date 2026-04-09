@@ -620,16 +620,12 @@
       const contactName = call.contactName || call.phone || 'Unknown';
       const dateStr = formatDate(call.dateAdded);
       const badge = callOutcomeBadge(call, contactOppMap);
-      const dur = call.duration || 0;
-      const durStr = dur > 0
-        ? `${Math.floor(dur / 60)}m ${String(Math.floor(dur % 60)).padStart(2, '0')}s`
-        : '—';
       return `
         <div class="call-row" data-conv-id="${escHtml(call.conversationId)}" data-client-id="${escHtml(call._clientId)}">
           <div class="dir-dot ${dir}"></div>
           <div class="call-info">
             <div class="call-contact">${escHtml(contactName)}</div>
-            <div class="call-time">${dateStr} &middot; ${durStr}</div>
+            <div class="call-time">${dateStr} &middot; <span class="call-dur">—</span></div>
           </div>
           ${badge}
         </div>`;
@@ -639,16 +635,16 @@
       row.addEventListener('click', () => {
         $callList.querySelectorAll('.call-row').forEach(r => r.classList.remove('active'));
         row.classList.add('active');
-        openCallDetail(row.dataset.convId, row.dataset.clientId);
+        openCallDetail(row.dataset.convId, row.dataset.clientId, row);
       });
     });
   }
 
   // ─── Call Detail ─────────────────────────────────────────────────────────────
-  async function openCallDetail(convId, clientId) {
+  async function openCallDetail(convId, clientId, row) {
     $callDetail.classList.remove('hidden');
     resetAudioPlayer();
-    $transcriptText.textContent = 'Loading transcript…';
+    $transcriptText.textContent = 'Loading…';
 
     const call = appData.calls.find(c => c.conversationId === convId);
     const clientCfg = appData.config.clients.find(c => c.locationId === clientId);
@@ -664,21 +660,46 @@
       ${clientName ? `<span>${escHtml(clientName)}</span>` : ''}
     `;
 
-    const messageId = call ? call.messageId : null;
+    // Fetch messages for this conversation to get messageId, duration, status
+    // If already cached on the call object from a previous click, skip the fetch
+    let messageId = (call && call.messageId) || null;
+    if (!messageId) {
+      try {
+        const msgInfo = await apiFetch(
+          `/api/conversations/${encodeURIComponent(convId)}/messages?locationId=${encodeURIComponent(clientId)}`
+        );
+        messageId = msgInfo.messageId || null;
 
-    // Load recording via official messageId endpoint
+        // Update duration in the call row
+        if (row) {
+          const durSpan = row.querySelector('.call-dur');
+          if (durSpan) {
+            const dur = msgInfo.duration;
+            durSpan.textContent = (dur && dur > 0)
+              ? `${Math.floor(dur / 60)}m ${String(Math.floor(dur % 60)).padStart(2, '0')}s`
+              : '—';
+          }
+        }
+
+        // Cache messageId back onto the call object so repeat clicks skip re-fetch
+        if (call && messageId) call.messageId = messageId;
+      } catch (_) {
+        // proceed without messageId
+      }
+    }
+
+    // Load recording
     if (messageId) {
       $audioEl.src = `/api/recording?messageId=${encodeURIComponent(messageId)}&locationId=${encodeURIComponent(clientId)}`;
       $audioEl.load();
     }
 
-    // Load transcript via official messageId endpoint
+    // Load transcript
     if (messageId) {
       try {
         const tData = await apiFetch(
           `/api/transcription?messageId=${encodeURIComponent(messageId)}&locationId=${encodeURIComponent(clientId)}`
         );
-        // GHL may return { transcriptionText: "..." } or { text: "..." } or similar
         const text = tData.transcriptionText || tData.text || tData.transcript ||
           (typeof tData === 'string' ? tData : null);
         $transcriptText.textContent = text || 'No transcript available';

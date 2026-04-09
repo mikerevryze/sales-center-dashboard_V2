@@ -1,0 +1,40 @@
+401 on that endpoint — it doesn't support location API keys, only OAuth. That endpoint is off limits for us.
+
+So we're back to the conversation search + message fetch approach. The problem is speed. Let me think about this differently.
+
+We already know conversations with `lastMessageType=TYPE_CALL` exist. The conversation object itself has `lastMessageType`, `lastMessageDirection`, `lastMessageDate`, and `contactName` — **that's enough to show the call log without fetching messages at all.** We only need to fetch messages when someone actually clicks a call to get the recording and transcript.
+
+Paste this into Replit Agent:
+
+---
+
+> Rewrite `/api/locations/:locationId/calls` to be fast and simple:
+>
+> **Do NOT fetch messages for every conversation.** Just do one API call:
+> `GET https://services.leadconnectorhq.com/conversations/search?locationId={locationId}&lastMessageType=TYPE_CALL&limit=50&sortBy=last_message_date&sortOrder=desc`
+> with headers `Authorization: Bearer {locationKey}` and `Version: 2021-07-28`.
+>
+> Return the conversations directly, mapped to this shape:
+> ```javascript
+> {
+>   conversationId: conv.id,
+>   messageId: null, // fetched on demand when clicked
+>   contactName: conv.contactName,
+>   contactId: conv.contactId,
+>   phone: conv.phone || conv.lastMessageBody,
+>   direction: conv.lastMessageDirection,
+>   dateAdded: conv.lastMessageDate,
+>   duration: null, // fetched on demand when clicked
+>   status: conv.lastMessageType,
+>   userId: conv.assignedTo,
+>   locationId: locationId
+> }
+> ```
+>
+> This returns instantly with one API call and no looping.
+>
+> Then update the call detail flow — when a user clicks a call row, the frontend hits `/api/conversations/:conversationId/messages?locationId=` which fetches that single conversation's messages, finds the TYPE_CALL message, extracts `meta.call.duration`, `meta.call.status`, and the messageId, then uses that messageId to fetch recording and transcript.
+>
+> Update the frontend call rows to show: contact name, date/time, direction badge, and "—" for duration until clicked. Duration updates to real value after messages load on click.
+>
+> Keep the 5 minute cache on the calls list. Do not change anything else.
