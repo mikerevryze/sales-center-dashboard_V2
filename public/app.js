@@ -711,8 +711,14 @@
         console.log(`[openCallDetail] fetching transcript: ${transcriptUrl}`);
         const tData = await apiFetch(transcriptUrl);
         console.log(`[openCallDetail] transcript response:`, tData);
-        const text = tData.transcriptionText || tData.text || tData.transcript ||
-          (typeof tData === 'string' ? tData : null);
+        let text = null;
+        if (Array.isArray(tData) && tData.length > 0) {
+          text = tData.map(s => s.transcript).filter(Boolean).join(' ');
+        } else if (tData && typeof tData === 'object') {
+          text = tData.transcriptionText || tData.text || tData.transcript || null;
+        } else if (typeof tData === 'string') {
+          text = tData;
+        }
         $transcriptText.textContent = text || 'No transcript available';
       } catch (err) {
         console.error(`[openCallDetail] transcript fetch failed:`, err);
