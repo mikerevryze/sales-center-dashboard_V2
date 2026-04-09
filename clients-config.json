@@ -5,6 +5,18 @@
       "name": "4Ever Franchisor LLC",
       "apiKeyEnvVar": "GHL_KEY_4EVER",
       "pipelines": []
+    },
+    {
+      "locationId": "",
+      "name": "STRONG Pilates — Momentic",
+      "apiKeyEnvVar": "GHL_KEY_STRONG_PILATES",
+      "pipelines": []
+    },
+    {
+      "locationId": "",
+      "name": "Texas Longevity Lab Corp",
+      "apiKeyEnvVar": "GHL_KEY_TEXAS_LONGEVITY",
+      "pipelines": []
     }
   ]
 }
