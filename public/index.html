@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Revryze Sales Center</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2300f5a0' rx='6'/%3E%3Ctext x='5' y='24' font-family='Arial Black,Arial' font-size='22' font-weight='900' fill='%230a0a0a'%3ER%3C/text%3E%3C/svg%3E" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -17,100 +18,146 @@
 
   <div id="error-banner" class="error-banner hidden"></div>
 
+  <!-- ─── Header ─────────────────────────────────────────────────────────── -->
   <header class="header">
     <div class="header-brand">
-      <span class="logo">REVRYZE</span>
-      <span class="logo-sub">Sales Center</span>
+      <img src="/revryze-logo.png" alt="Revryze" class="header-logo" />
     </div>
-    <div class="header-filters">
-      <select id="client-select" class="ctrl-select">
+    <nav class="nav-tabs">
+      <button class="nav-tab active" data-tab="command">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/></svg>
+        <span>Command Center</span>
+      </button>
+      <button class="nav-tab" data-tab="calls">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg>
+        <span>Calls</span>
+      </button>
+      <button class="nav-tab" data-tab="sms">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z"/><path d="M15 7v2a4 4 0 01-4 4H9.828l-1.766 1.767c.28.149.599.233.938.233h2l3 3v-3h2a2 2 0 002-2V9a2 2 0 00-2-2h-1z"/></svg>
+        <span>Conversations</span>
+      </button>
+      <button class="nav-tab" data-tab="spiff">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+        <span>Weekly SPIFF</span>
+      </button>
+    </nav>
+    <div class="header-right">
+      <button id="refresh-btn" class="btn-refresh" title="Refresh data">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- TAB 1: COMMAND CENTER                                                   -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <section id="tab-command" class="tab-section active">
+
+    <div class="filter-bar">
+      <select id="cc-client-select" class="ctrl-select">
         <option value="all">All clients</option>
       </select>
-      <select id="location-select" class="ctrl-select">
-        <option value="all">All locations</option>
+      <select id="cc-location-select" class="ctrl-select">
+        <option value="all">All pipelines</option>
       </select>
-      <select id="date-select" class="ctrl-select">
+      <select id="cc-date-select" class="ctrl-select">
         <option value="7">Last 7 days</option>
         <option value="30" selected>Last 30 days</option>
         <option value="90">Last 90 days</option>
       </select>
-      <button id="refresh-btn" class="btn btn-outline">&#8635; Refresh</button>
     </div>
-  </header>
 
-  <section class="metrics-bar">
-    <div class="metric-card">
-      <div class="metric-value" id="m-sold">—</div>
-      <div class="metric-label">Memberships Sold</div>
+    <div class="metrics-bar">
+      <div class="metric-card">
+        <div class="metric-value accent" id="m-sold">—</div>
+        <div class="metric-label">Memberships Sold</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value" id="m-revenue">—</div>
+        <div class="metric-label">Revenue Closed</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value" id="m-calls">—</div>
+        <div class="metric-label">Total Calls</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value" id="m-talktime">—</div>
+        <div class="metric-label">Talk Time</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value accent" id="m-rate">—</div>
+        <div class="metric-label">Close Rate</div>
+      </div>
     </div>
-    <div class="metric-card">
-      <div class="metric-value" id="m-revenue">—</div>
-      <div class="metric-label">Revenue Closed</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-value" id="m-appts">—</div>
-      <div class="metric-label">Appointments Set</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-value" id="m-calls">—</div>
-      <div class="metric-label">Total Calls</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-value" id="m-rate">—</div>
-      <div class="metric-label">Close Rate</div>
-    </div>
-  </section>
 
-  <main class="main-grid">
-
-    <div class="left-col">
-
-      <section class="panel" id="rep-lb-panel">
+    <div class="two-col">
+      <div class="panel">
         <div class="panel-header">
           <h2 class="panel-title">Rep Leaderboard</h2>
-          <select id="rep-sort" class="ctrl-select ctrl-select-sm">
+          <select id="rep-sort" class="ctrl-select ctrl-sm">
             <option value="sold">Memberships Sold</option>
             <option value="revenue">Revenue</option>
-            <option value="appointments">Appointments</option>
             <option value="calls">Call Volume</option>
+            <option value="talktime">Talk Time</option>
           </select>
         </div>
         <div id="rep-lb-list" class="lb-list"></div>
-      </section>
+      </div>
 
-      <section class="panel" id="client-lb-panel">
+      <div class="panel">
         <div class="panel-header">
           <h2 class="panel-title">Client Leaderboard</h2>
-          <select id="client-sort" class="ctrl-select ctrl-select-sm">
+          <select id="client-sort" class="ctrl-select ctrl-sm">
             <option value="sold">Memberships Sold</option>
             <option value="revenue">Revenue</option>
             <option value="closeRate">Close Rate</option>
           </select>
         </div>
         <div id="client-lb-list" class="lb-list"></div>
-      </section>
-
+      </div>
     </div>
 
-    <div class="right-col">
+  </section>
 
-      <section class="panel" id="call-log-panel">
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- TAB 2: CALLS                                                            -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <section id="tab-calls" class="tab-section hidden">
+
+    <div class="filter-bar">
+      <input id="calls-search" class="ctrl-input" type="text" placeholder="Search contact…" />
+      <select id="calls-rep-select" class="ctrl-select">
+        <option value="all">All reps</option>
+      </select>
+      <select id="calls-client-select" class="ctrl-select">
+        <option value="all">All clients</option>
+      </select>
+      <select id="calls-date-select" class="ctrl-select">
+        <option value="7">Last 7 days</option>
+        <option value="30" selected>Last 30 days</option>
+        <option value="90">Last 90 days</option>
+      </select>
+      <div class="dir-tabs" id="dir-tabs">
+        <button class="dtab active" data-dir="all">All</button>
+        <button class="dtab" data-dir="outbound">Outbound</button>
+        <button class="dtab" data-dir="inbound">Inbound</button>
+        <button class="dtab" data-dir="missed">Missed</button>
+      </div>
+    </div>
+
+    <div class="calls-layout">
+      <div class="panel calls-panel">
         <div class="panel-header">
           <h2 class="panel-title" id="call-log-title">All Calls</h2>
-          <div class="filter-tabs" id="dir-tabs">
-            <button class="tab active" data-dir="all">All</button>
-            <button class="tab" data-dir="outbound">Outbound</button>
-            <button class="tab" data-dir="inbound">Inbound</button>
-            <button class="tab" data-dir="missed">Missed</button>
-          </div>
+          <span class="panel-count" id="call-log-count"></span>
         </div>
         <div id="call-log-list" class="call-list"></div>
-      </section>
+      </div>
 
-      <section class="panel hidden" id="call-detail-panel">
+      <div class="panel call-detail-panel hidden" id="call-detail-panel">
         <div class="panel-header">
           <h2 class="panel-title">Call Detail</h2>
-          <button class="btn-icon" id="close-detail-btn">&#x2715;</button>
+          <button class="btn-icon" id="close-detail-btn" title="Close">&#x2715;</button>
         </div>
         <div class="call-meta" id="call-meta"></div>
         <div class="audio-player">
@@ -121,14 +168,89 @@
           <span class="time-label" id="time-label">0:00 / 0:00</span>
           <audio id="audio-el"></audio>
         </div>
-        <div class="transcript-box">
-          <div class="transcript-label">Transcript</div>
+        <div class="detail-section">
+          <div class="detail-section-label">Transcript</div>
           <div class="transcript-text" id="transcript-text">No transcript available</div>
         </div>
-      </section>
-
+        <div class="detail-section">
+          <div class="detail-section-label">AI Analysis</div>
+          <button class="btn-ai" id="ai-analyze-btn">✦ Analyze with AI</button>
+          <div id="ai-results" class="ai-results hidden"></div>
+        </div>
+        <div class="detail-section">
+          <div class="detail-section-label">Manager Notes</div>
+          <div id="existing-note" class="existing-note hidden"></div>
+          <textarea id="manager-note-text" class="note-textarea" placeholder="Add coaching notes…" rows="3"></textarea>
+          <div class="note-actions">
+            <button class="btn-save-note" id="save-note-btn">Save Note</button>
+            <label class="flag-toggle">
+              <input type="checkbox" id="flag-toggle" />
+              <span class="flag-label">🚩 Flag for review</span>
+            </label>
+          </div>
+        </div>
+      </div>
     </div>
-  </main>
+
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- TAB 3: CONVERSATIONS (SMS)                                              -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <section id="tab-sms" class="tab-section hidden">
+
+    <div class="filter-bar">
+      <input id="sms-search" class="ctrl-input" type="text" placeholder="Search contact…" />
+      <select id="sms-client-select" class="ctrl-select">
+        <option value="all">All clients</option>
+      </select>
+    </div>
+
+    <div class="calls-layout">
+      <div class="panel calls-panel">
+        <div class="panel-header">
+          <h2 class="panel-title">SMS Conversations</h2>
+          <span class="panel-count" id="sms-count"></span>
+        </div>
+        <div id="sms-list" class="call-list"></div>
+      </div>
+
+      <div class="panel call-detail-panel hidden" id="sms-thread-panel">
+        <div class="panel-header">
+          <h2 class="panel-title" id="sms-thread-contact">Conversation</h2>
+          <button class="btn-icon" id="close-sms-btn" title="Close">&#x2715;</button>
+        </div>
+        <div id="sms-thread-messages" class="sms-thread"></div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- TAB 4: WEEKLY SPIFF                                                     -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <section id="tab-spiff" class="tab-section hidden">
+
+    <div class="filter-bar">
+      <select id="spiff-week-select" class="ctrl-select">
+        <option value="current">Current Week</option>
+      </select>
+    </div>
+
+    <div class="spiff-banner" id="spiff-banner">
+      <div class="spiff-banner-label">CURRENT SPIFF WEEK</div>
+      <div class="spiff-banner-range" id="spiff-banner-range">—</div>
+    </div>
+
+    <div class="panel spiff-panel">
+      <div class="panel-header">
+        <h2 class="panel-title">Weekly Rankings</h2>
+        <span class="spiff-sub">Memberships sold this week</span>
+      </div>
+      <div id="spiff-lb-list" class="lb-list spiff-lb"></div>
+    </div>
+
+  </section>
 
   <script src="app.js"></script>
 </body>

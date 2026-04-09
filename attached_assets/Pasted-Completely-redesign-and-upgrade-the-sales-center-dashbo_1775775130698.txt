@@ -1,0 +1,86 @@
+Completely redesign and upgrade the sales-center-dashboard_V2 app into a Gong-style call center OS for Revryze. Keep all existing backend API endpoints and GHL data connections — only redesign the frontend and add new features.
+Brand & Design:
+
+Dark theme throughout: background #0a0a0a, panels #111111, borders #1f1f1f, accent green #00f5a0, secondary text #888888
+Header uses Revryze logo from /public/revryze-logo.png (we will upload it) — for now use text "REVRYZE" in green with the R icon as a unicode placeholder
+Favicon: use a green R — set <link rel="icon"> to a base64 encoded green square with R
+All buttons, active states, badges use #00f5a0 green on dark backgrounds
+Cards: #111111 background, 1px solid #1f1f1f border, border-radius: 12px
+Typography: white for primary, #888 for secondary, green for metrics and highlights
+Sold badge: green #00f5a0 text on rgba(0,245,160,0.1) background
+In Pipeline badge: #888 on #1a1a1a
+
+Layout — four main sections via top nav tabs:
+Tab 1: Command Center (default)
+
+Top filter bar: client dropdown, location/pipeline dropdown, date range (Last 7 / 30 / 90 days), Week picker for SPIFF
+5 metric cards in a row: Memberships Sold, Revenue Closed, Total Calls, Talk Time (sum of all call durations formatted as "Xh Ym"), Close Rate
+Two column layout below:
+
+Left: Rep Leaderboard (sortable by sold/revenue/calls/talk time) with gold/silver/bronze rank badges, avatar initials in green, rep name, calls + close rate subline, primary stat right-aligned
+Right: Client Leaderboard (sortable by sold/revenue/close rate)
+
+
+
+Tab 2: Calls
+
+Filter bar: rep filter dropdown, client filter, date range, search by contact name
+Call log showing ONLY phone calls (lastMessageType=TYPE_CALL)
+Each row: colored direction dot (green=inbound, blue=outbound, red=missed), contact name, rep name, date/time, duration, outcome badge (Sold/In Pipeline/No Answer)
+Clicking a call opens a full Call Detail panel on the right:
+
+Contact info header: name, phone, date, rep name, client/location
+Audio player: dark styled, play/pause, scrubable progress bar in green, time display
+AI Analysis section (calls Claude API):
+
+Button "Analyze with AI" — when clicked, sends the transcript to Claude API with this system prompt: "You are a sales call analyst for Revryze, a franchise presale company. Analyze this call transcript and provide: 1) Speaker labels (Rep vs Lead) based on context, 2) A brief call summary (2-3 sentences), 3) Key moments (objections raised, buying signals, close attempts), 4) A score out of 10 with reasoning, 5) One coaching tip for the rep. Format as JSON with fields: speakerLabeledTranscript, summary, keyMoments, score, coachingTip"
+Display results: labeled transcript with Rep/Lead prefixes on each segment, summary card, score badge, key moments list, coaching tip
+
+
+Manager Notes section:
+
+Text area for manager to type feedback
+Save button — saves note to a call-notes.json file keyed by messageId { messageId: { note, savedAt, savedBy: "Manager" } }
+Displays existing note if one was previously saved
+"Flag for review" toggle — marks the call with a red flag icon in the call list
+
+
+
+
+
+Tab 3: Conversations (SMS)
+
+Same layout as Calls tab but shows SMS/text conversations
+Each row: contact name, rep name, last message preview, date, outcome badge
+Clicking opens conversation thread view showing full SMS exchange, newest at bottom
+No audio player — just the message thread
+
+Tab 4: Weekly SPIFF
+
+Week selector (Mon–Sun) defaulting to current week
+Large leaderboard showing reps ranked by memberships sold THIS WEEK ONLY
+Big number display — rank 1 gets a gold crown icon, prominent green highlight
+Shows: rank, rep name, memberships sold this week, revenue this week, calls this week
+Banner at top: "Current SPIFF Week: [date range]" — style it like a competition scoreboard
+All data filtered to selected week using dateAdded/lastMessageDate
+
+Backend additions:
+
+GET /api/call-notes/:messageId — reads note from call-notes.json
+POST /api/call-notes/:messageId — saves note { note, flagged } to call-notes.json
+POST /api/ai-analyze — accepts { transcript, repName, contactName }, calls Anthropic API with the analysis prompt above using claude-sonnet-4-20250514, returns parsed JSON result. Use process.env.ANTHROPIC_API_KEY.
+GET /api/locations/:locationId/sms — fetches conversations where lastMessageType=TYPE_SMS, returns last 50 sorted by date desc
+GET /api/conversations/:conversationId/thread?locationId= — returns all messages in a conversation for SMS thread view
+
+Add to Replit Secrets: ANTHROPIC_API_KEY
+Other details:
+
+Upload Revryze logo: save the file /public/revryze-logo.png — for now generate a simple SVG placeholder with "REVRYZE" text in green that can be replaced later
+Keep all existing config, rep management, pipeline config — none of that changes
+Keep 5-minute cache on calls
+Smooth tab switching — no page reload, pure JS show/hide sections
+All dark mode — no white backgrounds anywhere except text inputs which get #1a1a1a background
+Mobile responsive — tabs collapse to icons on small screens
+
+Write every file completely. No placeholders, no TODOs.
+

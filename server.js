@@ -14,6 +14,7 @@ const GHL_API = 'https://services.leadconnectorhq.com';
 const AGENCY_KEY = process.env.GHL_AGENCY_API_KEY;
 const CLIENTS_CONFIG = path.join(__dirname, 'clients-config.json');
 const REPS_CONFIG = path.join(__dirname, 'reps-config.json');
+const CALL_NOTES_FILE = path.join(__dirname, 'call-notes.json');
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -650,6 +651,177 @@ app.get('/api/debug/recording', async (req, res) => {
   } catch (err) {
     console.error('GET /api/debug/recording error:', err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/call-notes/:messageId ─────────────────────────────────────────
+app.get('/api/call-notes/:messageId', async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const exists = await fse.pathExists(CALL_NOTES_FILE);
+    if (!exists) return res.json({});
+    const notes = await fse.readJson(CALL_NOTES_FILE);
+    res.json(notes[messageId] || {});
+  } catch (err) {
+    console.error('GET /api/call-notes error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── POST /api/call-notes/:messageId ────────────────────────────────────────
+app.post('/api/call-notes/:messageId', async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { note, flagged } = req.body;
+    const exists = await fse.pathExists(CALL_NOTES_FILE);
+    const notes = exists ? await fse.readJson(CALL_NOTES_FILE) : {};
+    notes[messageId] = { note: note || '', flagged: !!flagged, savedAt: new Date().toISOString() };
+    await fse.writeJson(CALL_NOTES_FILE, notes, { spaces: 2 });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('POST /api/call-notes error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── POST /api/ai-analyze ────────────────────────────────────────────────────
+app.post('/api/ai-analyze', async (req, res) => {
+  try {
+    const { transcript, repName, contactName } = req.body;
+    if (!transcript) return res.status(400).json({ error: 'transcript is required' });
+
+    const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+    if (!ANTHROPIC_KEY) return res.status(503).json({ error: 'ANTHROPIC_API_KEY not configured' });
+
+    const systemPrompt = `You are an expert sales call coach analyzing outbound sales calls for a fitness/wellness company.
+You evaluate call quality, identify key moments, and provide actionable coaching feedback.
+Respond ONLY with valid JSON in this exact structure:
+{
+  "score": <integer 1-10>,
+  "summary": "<2-3 sentence summary of the call>",
+  "keyMoments": [
+    { "type": "<e.g. Opening, Objection Handling, Close Attempt, Rapport Building, Discovery>", "description": "<what happened>" }
+  ],
+  "coachingTip": "<1-2 sentence actionable coaching tip for the rep>",
+  "labeledTranscript": [
+    { "speaker": "Rep", "text": "<their words>" },
+    { "speaker": "Lead", "text": "<their words>" }
+  ]
+}
+Limit keyMoments to 4. Limit labeledTranscript to 8 segments (most important ones).`;
+
+    const userPrompt = `Analyze this sales call between Rep (${repName || 'unknown'}) and Lead (${contactName || 'unknown'}):\n\n${transcript}`;
+
+    const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 1500,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      }),
+    });
+
+    if (!anthropicRes.ok) {
+      const errText = await anthropicRes.text();
+      console.error('[ai-analyze] Anthropic error:', anthropicRes.status, errText);
+      return res.status(502).json({ error: `Anthropic API error ${anthropicRes.status}: ${errText.slice(0, 200)}` });
+    }
+
+    const anthropicData = await anthropicRes.json();
+    const rawContent = anthropicData.content?.[0]?.text || '{}';
+
+    let parsed;
+    try {
+      parsed = JSON.parse(rawContent);
+    } catch (_) {
+      const match = rawContent.match(/\{[\s\S]*\}/);
+      parsed = match ? JSON.parse(match[0]) : { summary: rawContent };
+    }
+
+    res.json(parsed);
+  } catch (err) {
+    console.error('POST /api/ai-analyze error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/locations/:locationId/sms ─────────────────────────────────────
+app.get('/api/locations/:locationId/sms', async (req, res) => {
+  try {
+    const { locationId } = req.params;
+    const clientsData = await loadClientsConfig();
+    const client = findClient(clientsData.clients, locationId);
+    const apiKey = resolveLocationKey(client);
+
+    const callHeaders = {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      Version: '2021-04-15',
+    };
+
+    const url = `${GHL_API}/conversations/search?locationId=${locationId}&lastMessageType=TYPE_SMS&limit=100`;
+    const data = await ghlGet(url, callHeaders);
+
+    const conversations = data.conversations || data.data || [];
+    console.log(`[sms] location=${locationId} found ${conversations.length} SMS convos`);
+
+    res.json({ conversations });
+  } catch (err) {
+    console.error('GET /api/locations/:id/sms error:', err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/conversations/:conversationId/thread ───────────────────────────
+app.get('/api/conversations/:conversationId/thread', async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const { locationId } = req.query;
+    if (!locationId) return res.status(400).json({ error: 'locationId query param required' });
+
+    const clientsData = await loadClientsConfig();
+    const client = findClient(clientsData.clients, locationId);
+    const apiKey = resolveLocationKey(client);
+
+    const callHeaders = {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      Version: '2021-07-28',
+    };
+
+    const url = `${GHL_API}/conversations/${conversationId}/messages?limit=50`;
+    const data = await ghlGet(url, callHeaders);
+
+    // Handle nested response: { messages: { messages: [...] } }
+    let messages = [];
+    if (Array.isArray(data.messages)) {
+      messages = data.messages;
+    } else if (data.messages && Array.isArray(data.messages.messages)) {
+      messages = data.messages.messages;
+    }
+
+    // Filter to SMS messages only (type 1 or TYPE_SMS)
+    const smsMessages = messages.filter(m => {
+      const t = (m.messageType || m.type || '');
+      return String(t) === '1' || t === 'TYPE_SMS' || t === 'SMS';
+    });
+
+    // Sort by date ascending for thread view
+    smsMessages.sort((a, b) => {
+      const da = new Date(a.dateAdded || a.createdAt), db = new Date(b.dateAdded || b.createdAt);
+      return da - db;
+    });
+
+    res.json({ messages: smsMessages.length > 0 ? smsMessages : messages });
+  } catch (err) {
+    console.error('GET /api/conversations/:id/thread error:', err.message);
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 
