@@ -1,0 +1,135 @@
+Rebuild sales-center-dashboard_V2 completely from scratch. This is the Revryze internal call center dashboard. Revryze runs presale membership campaigns for boutique fitness/wellness franchise brands. Reps are US-based closers selling founding memberships via phone through GoHighLevel (GHL) with LC Phone for call recordings and transcripts.
+GHL structure:
+
+Sub-account = client (e.g. "Strong Pilates Momentic", "4Ever Franchisor LLC", "Texas Longevity Lab")
+Pipeline inside a sub-account = a specific location/opening (e.g. "Charlotte", "Raleigh")
+A "deal" = any opportunity in the "Closed Won" stage of a pipeline (each pipeline has its own Closed Won stage)
+
+Auth model:
+
+GHL_AGENCY_API_KEY in .env — used only for fetching sub-accounts list
+Each sub-account has its own Location API key stored in clients-config.json
+All pipeline, opportunity, call, and recording API calls use the location-specific key
+
+Backend config files (never touched from the UI):
+clients-config.json — manually maintained, structured as:
+json{
+  "clients": [
+    {
+      "locationId": "abc123",
+      "name": "STRONG Pilates — Momentic",
+      "apiKeyEnvVar": "GHL_KEY_STRONG_PILATES",
+      "pipelines": [
+        { "pipelineId": "pip1", "name": "Charlotte" },
+        { "pipelineId": "pip2", "name": "Raleigh" }
+      ]
+    },
+    {
+      "locationId": "def456",
+      "name": "4Ever Franchisor LLC",
+      "apiKeyEnvVar": "GHL_KEY_4EVER",
+      "pipelines": [
+        { "pipelineId": "pip3", "name": "Austin TX" }
+      ]
+    },
+    {
+      "locationId": "ghi789",
+      "name": "Texas Longevity Lab Corp",
+      "apiKeyEnvVar": "GHL_KEY_TEXAS_LONGEVITY",
+      "pipelines": [
+        { "pipelineId": "pip4", "name": "Dallas" }
+      ]
+    }
+  ]
+}
+Each client's API key is stored as an environment variable named in apiKeyEnvVar. This means keys never appear in any config file — only in Replit Secrets / .env.
+reps-config.json — manually maintained:
+json{
+  "reps": [
+    { "id": "userId123", "name": "Jordan Mills", "email": "jordan@revryze.com" }
+  ]
+}
+Add a GET /api/setup/pipelines/:locationId endpoint that hits the GHL API and prints all pipeline IDs and names for a given sub-account to make it easy to populate clients-config.json initially.
+Backend endpoints (server.js):
+
+GET /api/config — returns parsed clients-config.json and reps-config.json combined
+GET /api/setup/pipelines/:locationId — fetches and returns raw pipeline list for setup purposes
+GET /api/locations/:locationId/opportunities?pipelineId=&startDate=&endDate= — fetches all opportunities, filters to "Closed Won" stage server-side before returning
+GET /api/locations/:locationId/calls?userId=&startDate=&endDate= — fetches conversations
+GET /api/conversations/:conversationId/messages?locationId= — fetches messages with recordings/transcripts
+GET /api/recording?url=&locationId= — proxies audio using that location's API key
+
+All endpoints resolve the correct API key by looking up apiKeyEnvVar from clients-config.json and reading process.env[apiKeyEnvVar].
+Frontend — single page, four levels of filtering:
+Top filter bar (always visible):
+
+"All clients" dropdown — options: All, Strong Pilates Momentic, 4Ever Franchisor LLC, Texas Longevity Lab Corp
+"All locations" dropdown — populates with pipelines from selected client (or all pipelines across all clients if "All" selected)
+Date range dropdown: Last 7 / 30 / 90 days
+Refresh button
+
+Metrics bar (5 cards, always visible, updates with filters):
+
+Memberships sold (Closed Won count)
+Revenue closed (sum of monetary value on Closed Won opps)
+Appointments set
+Total calls
+Close rate (Closed Won / total calls)
+
+Main grid — two columns:
+Left column (stacked):
+Rep leaderboard panel
+
+Ranked by memberships sold (default), switchable to: revenue / appointments / call volume
+Each row: gold/silver/bronze rank badge for top 3, avatar initials, rep name, sub-line with calls + close rate, primary stat right-aligned
+Clicking a rep loads their calls in the call log panel
+Aggregate across all clients/pipelines unless filtered
+
+Client leaderboard panel
+
+One row per client showing: client name, memberships sold, revenue closed, close rate, active reps count
+Sortable by memberships sold / revenue / close rate
+Clicking a client filters the entire dashboard to that client
+
+Right column (stacked):
+Call log panel
+
+Header shows selected rep name or "All calls"
+Filter tabs: All / Outbound / Inbound / Missed
+Each row: direction dot (blue=outbound, green=inbound, red=missed), contact name, date/time, duration, outcome badge
+Outcome badge logic: if associated opp is Closed Won = "Sold" (green), if opp exists but not won = "In pipeline" (blue), no opp = direction label (gray)
+Clicking a call opens call detail panel
+
+Call detail panel (hidden until call clicked):
+
+Meta bar: contact name, phone, date/time, which client/pipeline
+Audio player: play/pause, scrubbable progress bar, timestamp — audio via /api/recording
+Transcript: scrollable box, pulls meta.transcriptionText from GHL message, fallback "No transcript available"
+Close button resets panel
+
+Data loading:
+
+On page load: read config, fetch opportunities + calls for all configured clients in parallel with Promise.all
+Store everything in a flat in-memory appData object client-side
+All filtering (by client, pipeline, rep, date, call direction) done client-side — no extra API calls on filter change
+Manual refresh button re-fetches everything
+Show a loading spinner while fetching, error banner if any client fails to load
+
+Design: Clean minimal professional. White panels #ffffff, page background #f4f4f2, borders 1px solid #e8e8e5, border radius 10px on panels 8px on elements. No gradients, no shadows except subtle 0 1px 3px rgba(0,0,0,0.06) on panels. Fully responsive — stacks to single column on mobile. Typography: system font stack, 14px base. Metric values 24px 600 weight. Rep names 13px 500. Muted labels 11px uppercase tracked.
+Empty states:
+
+No API keys configured: "Add your GHL Location API keys to Replit Secrets to get started — see README for instructions"
+No reps configured: "Add reps to reps-config.json to populate the leaderboard"
+No data for date range: "No activity found for this period"
+
+README.md — include a setup guide:
+
+Add GHL_AGENCY_API_KEY to Replit Secrets
+Use /api/setup/pipelines/:locationId to look up pipeline IDs for each sub-account
+Fill in clients-config.json with locationIds, pipeline IDs, and the env var name for each key
+Add each location API key to Replit Secrets using the env var names from step 3
+Add reps to reps-config.json
+Hit refresh
+
+package.json: "start": "node server.js", dependencies: express, node-fetch@2, cors, dotenv, fs-extra
+Write every single file completely. No placeholder comments, no TODOs, no stubs. Fully working production-ready code.

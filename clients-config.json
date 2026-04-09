@@ -1,0 +1,10 @@
+{
+  "clients": [
+    {
+      "locationId": "PheJU6K11WwiJnS2pAat",
+      "name": "4Ever Franchisor LLC",
+      "apiKeyEnvVar": "GHL_KEY_4EVER",
+      "pipelines": []
+    }
+  ]
+}

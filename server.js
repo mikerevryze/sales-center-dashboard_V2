@@ -11,98 +11,188 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const GHL_API = 'https://services.leadconnectorhq.com';
-const API_KEY = process.env.GHL_AGENCY_API_KEY;
+const AGENCY_KEY = process.env.GHL_AGENCY_API_KEY;
+const CLIENTS_CONFIG = path.join(__dirname, 'clients-config.json');
 const REPS_CONFIG = path.join(__dirname, 'reps-config.json');
 
-function ghlHeaders(extraHeaders = {}) {
+function agencyHeaders() {
   return {
-    Authorization: `Bearer ${API_KEY}`,
+    Authorization: `Bearer ${AGENCY_KEY}`,
     'Content-Type': 'application/json',
     Version: '2021-04-15',
-    ...extraHeaders,
   };
 }
 
-async function ghlFetch(url, opts = {}) {
-  const res = await fetch(url, {
-    headers: ghlHeaders(opts.headers || {}),
-    ...opts,
-  });
+function locationHeaders(apiKey) {
+  return {
+    Authorization: `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+    Version: '2021-04-15',
+  };
+}
+
+async function ghlGet(url, headers) {
+  const res = await fetch(url, { headers });
   if (!res.ok) {
     const text = await res.text();
-    const err = new Error(`GHL API ${res.status}: ${text}`);
+    const err = new Error(`GHL ${res.status}: ${text}`);
     err.status = res.status;
     throw err;
   }
   return res.json();
 }
 
-// ─── Locations (sub-accounts) ───────────────────────────────────────────────
-app.get('/api/locations', async (req, res) => {
+async function loadClientsConfig() {
+  const exists = await fse.pathExists(CLIENTS_CONFIG);
+  if (!exists) {
+    await fse.writeJson(CLIENTS_CONFIG, { clients: [] }, { spaces: 2 });
+  }
+  return fse.readJson(CLIENTS_CONFIG);
+}
+
+async function loadRepsConfig() {
+  const exists = await fse.pathExists(REPS_CONFIG);
+  if (!exists) {
+    await fse.writeJson(REPS_CONFIG, { reps: [] }, { spaces: 2 });
+  }
+  return fse.readJson(REPS_CONFIG);
+}
+
+function resolveLocationKey(client) {
+  const key = process.env[client.apiKeyEnvVar];
+  if (!key) {
+    const err = new Error(`Missing env var: ${client.apiKeyEnvVar}`);
+    err.status = 503;
+    throw err;
+  }
+  return key;
+}
+
+function findClient(clients, locationId) {
+  const client = clients.find(c => c.locationId === locationId);
+  if (!client) {
+    const err = new Error(`Unknown locationId: ${locationId}`);
+    err.status = 404;
+    throw err;
+  }
+  return client;
+}
+
+// ─── GET /api/config ────────────────────────────────────────────────────────
+app.get('/api/config', async (req, res) => {
   try {
-    const data = await ghlFetch(`${GHL_API}/locations/search`, {});
-    res.json(data);
+    const [clientsData, repsData] = await Promise.all([loadClientsConfig(), loadRepsConfig()]);
+    res.json({ clients: clientsData.clients || [], reps: repsData.reps || [] });
   } catch (err) {
-    console.error('GET /api/locations error:', err.message);
+    console.error('GET /api/config error:', err.message);
     res.status(err.status || 500).json({ error: err.message });
   }
 });
 
-// ─── Users for a location ───────────────────────────────────────────────────
-app.get('/api/locations/:locationId/users', async (req, res) => {
+// ─── GET /api/setup/pipelines/:locationId ───────────────────────────────────
+// Dev helper: uses agency key to list pipelines for a location
+app.get('/api/setup/pipelines/:locationId', async (req, res) => {
   try {
     const { locationId } = req.params;
-    const data = await ghlFetch(`${GHL_API}/users/search`, {
-      headers: { 'channel-Id': locationId },
-    });
-    res.json(data);
-  } catch (err) {
-    console.error('GET /api/locations/:id/users error:', err.message);
-    res.status(err.status || 500).json({ error: err.message });
-  }
-});
-
-// ─── Pipelines for a location ───────────────────────────────────────────────
-app.get('/api/locations/:locationId/pipelines', async (req, res) => {
-  try {
-    const { locationId } = req.params;
-    const data = await ghlFetch(
+    const data = await ghlGet(
       `${GHL_API}/opportunities/pipelines?locationId=${locationId}`,
-      {}
+      agencyHeaders()
     );
     res.json(data);
   } catch (err) {
-    console.error('GET /api/locations/:id/pipelines error:', err.message);
+    console.error('GET /api/setup/pipelines error:', err.message);
     if (err.status === 401) {
-      return res.json({ pipelines: [] });
+      return res.json({ pipelines: [], note: 'Agency key not authorized for pipelines scope' });
     }
     res.status(err.status || 500).json({ error: err.message });
   }
 });
 
-// ─── Calls (conversations) for a location ───────────────────────────────────
+// ─── GET /api/locations/:locationId/opportunities ────────────────────────────
+// Returns only Closed Won opportunities (status === 'won')
+app.get('/api/locations/:locationId/opportunities', async (req, res) => {
+  try {
+    const { locationId } = req.params;
+    const { pipelineId, startDate, endDate } = req.query;
+    const clientsData = await loadClientsConfig();
+    const client = findClient(clientsData.clients, locationId);
+    const apiKey = resolveLocationKey(client);
+
+    let url = `${GHL_API}/opportunities/search?locationId=${locationId}`;
+    if (pipelineId) url += `&pipelineId=${encodeURIComponent(pipelineId)}`;
+    if (startDate) url += `&startDate=${encodeURIComponent(startDate)}`;
+    if (endDate) url += `&endDate=${encodeURIComponent(endDate)}`;
+
+    const allOpps = [];
+    let page = 1;
+    let hasMore = true;
+
+    while (hasMore) {
+      const pageUrl = url + `&page=${page}&limit=100`;
+      const data = await ghlGet(pageUrl, locationHeaders(apiKey));
+      const opps = data.opportunities || [];
+      allOpps.push(...opps);
+      const meta = data.meta || {};
+      hasMore = opps.length === 100 && (meta.total ? allOpps.length < meta.total : true);
+      page++;
+      if (page > 20) break;
+    }
+
+    res.json({ opportunities: allOpps, total: allOpps.length });
+  } catch (err) {
+    console.error('GET /api/locations/:id/opportunities error:', err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/locations/:locationId/calls ────────────────────────────────────
 app.get('/api/locations/:locationId/calls', async (req, res) => {
   try {
     const { locationId } = req.params;
-    const { userId, startDate } = req.query;
-    let url = `${GHL_API}/conversations/search?locationId=${locationId}&type=TYPE_PHONE`;
-    if (userId) url += `&assignedTo=${userId}`;
+    const { userId, startDate, endDate } = req.query;
+    const clientsData = await loadClientsConfig();
+    const client = findClient(clientsData.clients, locationId);
+    const apiKey = resolveLocationKey(client);
+
+    let url = `${GHL_API}/conversations/search?locationId=${locationId}&type=TYPE_PHONE&limit=100`;
+    if (userId) url += `&assignedTo=${encodeURIComponent(userId)}`;
     if (startDate) url += `&startAfterDate=${encodeURIComponent(startDate)}`;
-    const data = await ghlFetch(url, {});
-    res.json(data);
+    if (endDate) url += `&endBeforeDate=${encodeURIComponent(endDate)}`;
+
+    const allConvs = [];
+    let page = 1;
+    let hasMore = true;
+
+    while (hasMore) {
+      const pageUrl = url + `&page=${page}`;
+      const data = await ghlGet(pageUrl, locationHeaders(apiKey));
+      const convs = data.conversations || [];
+      allConvs.push(...convs);
+      const meta = data.meta || {};
+      hasMore = convs.length === 100 && (meta.total ? allConvs.length < meta.total : true);
+      page++;
+      if (page > 20) break;
+    }
+
+    res.json({ conversations: allConvs, total: allConvs.length });
   } catch (err) {
     console.error('GET /api/locations/:id/calls error:', err.message);
     res.status(err.status || 500).json({ error: err.message });
   }
 });
 
-// ─── Messages for a conversation (includes recordings / transcripts) ────────
+// ─── GET /api/conversations/:conversationId/messages ─────────────────────────
 app.get('/api/conversations/:conversationId/messages', async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const data = await ghlFetch(
+    const { locationId } = req.query;
+    if (!locationId) return res.status(400).json({ error: 'locationId query param required' });
+    const clientsData = await loadClientsConfig();
+    const client = findClient(clientsData.clients, locationId);
+    const apiKey = resolveLocationKey(client);
+    const data = await ghlGet(
       `${GHL_API}/conversations/${conversationId}/messages`,
-      {}
+      locationHeaders(apiKey)
     );
     res.json(data);
   } catch (err) {
@@ -111,12 +201,16 @@ app.get('/api/conversations/:conversationId/messages', async (req, res) => {
   }
 });
 
-// ─── Proxy audio recordings (avoids CORS) ───────────────────────────────────
+// ─── GET /api/recording ──────────────────────────────────────────────────────
 app.get('/api/recording', async (req, res) => {
   try {
-    const { url } = req.query;
+    const { url, locationId } = req.query;
     if (!url) return res.status(400).json({ error: 'url query param required' });
-    const audioRes = await fetch(url, { headers: ghlHeaders() });
+    if (!locationId) return res.status(400).json({ error: 'locationId query param required' });
+    const clientsData = await loadClientsConfig();
+    const client = findClient(clientsData.clients, locationId);
+    const apiKey = resolveLocationKey(client);
+    const audioRes = await fetch(url, { headers: locationHeaders(apiKey) });
     if (!audioRes.ok) {
       return res.status(audioRes.status).json({ error: 'Failed to fetch recording' });
     }
@@ -125,54 +219,7 @@ app.get('/api/recording', async (req, res) => {
     audioRes.body.pipe(res);
   } catch (err) {
     console.error('GET /api/recording error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ─── Opportunities for a location ───────────────────────────────────────────
-app.get('/api/locations/:locationId/opportunities', async (req, res) => {
-  try {
-    const { locationId } = req.params;
-    const { pipelineId } = req.query;
-    let url = `${GHL_API}/opportunities/search?locationId=${locationId}`;
-    if (pipelineId) url += `&pipelineId=${pipelineId}`;
-    const data = await ghlFetch(url, {});
-    res.json(data);
-  } catch (err) {
-    console.error('GET /api/locations/:id/opportunities error:', err.message);
-    if (err.status === 401) {
-      return res.json({ opportunities: [] });
-    }
     res.status(err.status || 500).json({ error: err.message });
-  }
-});
-
-// ─── Reps config ────────────────────────────────────────────────────────────
-app.get('/api/config/reps', async (req, res) => {
-  try {
-    const exists = await fse.pathExists(REPS_CONFIG);
-    if (!exists) {
-      await fse.writeJson(REPS_CONFIG, { reps: [] });
-    }
-    const data = await fse.readJson(REPS_CONFIG);
-    res.json(data);
-  } catch (err) {
-    console.error('GET /api/config/reps error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/config/reps', async (req, res) => {
-  try {
-    const { reps } = req.body;
-    if (!Array.isArray(reps)) {
-      return res.status(400).json({ error: 'reps must be an array' });
-    }
-    await fse.writeJson(REPS_CONFIG, { reps }, { spaces: 2 });
-    res.json({ success: true, reps });
-  } catch (err) {
-    console.error('POST /api/config/reps error:', err.message);
-    res.status(500).json({ error: err.message });
   }
 });
 
