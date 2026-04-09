@@ -226,7 +226,16 @@ app.get('/api/conversations/:conversationId/messages', async (req, res) => {
     if (!msgRes.ok) return res.status(msgRes.status).json({ error: `GHL ${msgRes.status}` });
 
     const msgData = await msgRes.json();
-    const messages = Array.isArray(msgData.messages) ? msgData.messages
+
+    // GHL returns { messages: { messages: [...], ... } } — the array is nested one level deeper
+    console.log(`[conv-messages] raw top-level keys:`, Object.keys(msgData));
+    console.log(`[conv-messages] typeof msgData.messages:`, typeof msgData.messages, Array.isArray(msgData.messages));
+    if (msgData.messages && typeof msgData.messages === 'object' && !Array.isArray(msgData.messages)) {
+      console.log(`[conv-messages] msgData.messages keys:`, Object.keys(msgData.messages));
+    }
+
+    const messages = Array.isArray(msgData.messages?.messages) ? msgData.messages.messages
+      : Array.isArray(msgData.messages) ? msgData.messages
       : Array.isArray(msgData.items) ? msgData.items
       : Array.isArray(msgData) ? msgData : [];
 
