@@ -1,0 +1,30 @@
+Big progress — call detail panel is opening, audio player is there, structure is solid. Here's what I see needs fixing:
+
+1. **Duplicate calls** — same contact showing multiple times
+2. **No duration on call rows** — showing "—" instead of actual time
+3. **No recordings playing** — 0:00 / 0:00 on every call
+4. **No transcript** — "No transcript available" on everything
+5. **No Closed Won indicator** on call rows — you need to see at a glance if that call resulted in a sale
+
+Paste this into Replit Agent:
+
+---
+
+> Fix the following five bugs in the call log and call detail:
+>
+> **Bug 1 — Duplicate calls:**
+> Conversations are being fetched multiple times — once per pipeline. Since conversations in GHL are at the location level (not pipeline level), deduplicate the call list by `conversation.id` before rendering. Use a Map keyed by `id` to ensure each conversation only appears once.
+>
+> **Bug 2 — Duration not showing on call rows:**
+> GHL conversations API does not return duration directly. Duration lives inside the individual messages. For the call log rows, fetch the messages for each conversation and extract `meta.callDuration` from the message where `messageType === 'TYPE_CALL'`. Show this as "Xm Ys" on the call row. If no call message found show "—". Do this in a batch after conversations load — fetch messages for all conversations in parallel with Promise.all but limit concurrency to 10 at a time to avoid rate limiting.
+>
+> **Bug 3 — Recordings not playing:**
+> The recording URL from GHL's `meta.recordingUrl` is a direct S3 or GHL-hosted URL that requires the Authorization header to access. The proxy endpoint `/api/recording` must forward the Authorization header using the correct location API key. Make sure the proxy endpoint reads the `locationId` query param, looks up the correct API key, and sets `Authorization: Bearer {locationKey}` when fetching the recording URL. Also set the correct `Content-Type` and `Accept-Ranges: bytes` headers on the response so the browser audio player can stream it properly.
+>
+> **Bug 4 — Transcripts not showing:**
+> After fetching messages for a conversation, look for a message where `messageType === 'TYPE_CALL'` and check `meta.transcriptionText`. Also check `body` field on that message as GHL sometimes puts the transcript there. If neither exists, check if there is a separate message in the thread with `messageType === 'TYPE_ACTIVITY_CONTACT'` that contains transcript text. Show whatever is found, fallback to "No transcript available" only if nothing is found.
+>
+> **Bug 5 — No Closed Won indicator on call rows:**
+> Each call row should show a green "Sold" badge if the contact associated with that conversation has an opportunity in Closed Won stage in any pipeline. Cross-reference the conversation's `contactId` against the already-loaded opportunities data (which is already in memory). If a match is found where `status === 'won'` or the stage name is "Closed Won", show a green "Sold" badge on that call row. Otherwise show the existing "In Pipeline" or direction badge.
+>
+> Do not change anything else.

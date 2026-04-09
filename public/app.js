@@ -37,7 +37,8 @@
     opportunities: [],
     calls: [],
     fetchedUsers: [],
-    repCallsMap: {},    // { [repId]: conversations[] } — fetched per-rep for accurate counts
+    repCallsMap: {},
+    callDurations: {},  // { [convId]: seconds } — cached per-conversation call durations
   };
 
   const filters = {
@@ -243,6 +244,16 @@
           appData.calls.push({ ...c, _clientId: r.clientId });
         });
       });
+      // Bug 1: deduplicate by conversation id (GHL may return same convo more than once)
+      {
+        const seen = new Map();
+        appData.calls = appData.calls.filter(c => {
+          const key = c.id || c._id;
+          if (!key || seen.has(key)) return false;
+          seen.set(key, true);
+          return true;
+        });
+      }
 
       // Fetch users for console reference logging
       const userFetches = clients
@@ -568,9 +579,54 @@
       const label = dir === 'outbound' ? 'Outbound' : dir === 'missed' ? 'Missed' : 'Inbound';
       return `<span class="badge badge-gray">${label}</span>`;
     }
-    const hasWon = opps.some(o => (o.status || '').toLowerCase() === 'won');
+    const hasWon = opps.some(o => {
+      if ((o.status || '').toLowerCase() === 'won') return true;
+      const stage = (o.pipelineStage || o.stageName || o.stage || '').toLowerCase();
+      return stage === 'closed won';
+    });
     if (hasWon) return `<span class="badge badge-sold">Sold</span>`;
     return `<span class="badge badge-pipeline">In Pipeline</span>`;
+  }
+
+  // Bug 2: batch-fetch call message durations for displayed rows, concurrency 10
+  // Only fetches the first 30 visible conversations to avoid GHL rate limits.
+  // Durations are cached in appData.callDurations and update rows in-place.
+  async function fetchCallDurations(displayed) {
+    const pending = displayed.slice(0, 30).filter(c => {
+      const key = c.id || c._id;
+      return key && appData.callDurations[key] === undefined;
+    });
+    for (let i = 0; i < pending.length; i += 5) {
+      const batch = pending.slice(i, i + 5);
+      await Promise.all(batch.map(async conv => {
+        const convId = conv.id || conv._id;
+        try {
+          const data = await apiFetch(
+            `/api/conversations/${encodeURIComponent(convId)}/messages?locationId=${encodeURIComponent(conv._clientId)}`
+          );
+          const msgs = Array.isArray(data.messages) ? data.messages : [];
+          const callMsg = msgs.find(m => m.messageType === 'TYPE_CALL');
+          appData.callDurations[convId] = callMsg?.meta?.callDuration || 0;
+        } catch (_) {
+          appData.callDurations[convId] = 0;
+        }
+        // Update the row in-place if still visible
+        const row = $callList.querySelector(`[data-conv-id="${CSS.escape(convId)}"]`);
+        if (row) {
+          const dur = appData.callDurations[convId];
+          const durStr = dur > 0
+            ? `${Math.floor(dur / 60)}m ${String(Math.floor(dur % 60)).padStart(2, '0')}s`
+            : '—';
+          const timeEl = row.querySelector('.call-time');
+          if (timeEl) {
+            const dateStr = formatDate(conv.lastMessageDate || conv.dateUpdated || conv.dateAdded);
+            timeEl.textContent = `${dateStr} · ${durStr}`;
+          }
+        }
+      }));
+      // Pause between batches to stay within GHL rate limits
+      if (i + 5 < pending.length) await new Promise(r => setTimeout(r, 1000));
+    }
   }
 
   function renderCallLog(calls, contactOppMap) {
@@ -607,9 +663,9 @@
       const dateStr = formatDate(conv.lastMessageDate || conv.dateUpdated || conv.dateAdded);
       const badge = callOutcomeBadge(conv, contactOppMap);
       const convId = conv.id || conv._id;
-      const durSec = conv.meta?.callDuration || conv.meta?.duration || conv.callDuration || conv.duration || 0;
-      const durStr = durSec > 0
-        ? `${Math.floor(durSec / 60)}m ${String(Math.floor(durSec % 60)).padStart(2, '0')}s`
+      const cachedDur = appData.callDurations[convId];
+      const durStr = (cachedDur > 0)
+        ? `${Math.floor(cachedDur / 60)}m ${String(Math.floor(cachedDur % 60)).padStart(2, '0')}s`
         : '—';
       return `
         <div class="call-row" data-conv-id="${escHtml(convId)}" data-client-id="${conv._clientId}">
@@ -621,6 +677,9 @@
           ${badge}
         </div>`;
     }).join('');
+
+    // Bug 2: fetch durations for displayed rows in background (updates rows in-place)
+    fetchCallDurations(displayed).catch(() => {});
 
     $callList.querySelectorAll('.call-row').forEach(row => {
       row.addEventListener('click', () => {
@@ -663,24 +722,44 @@
       const data = await apiFetch(
         `/api/conversations/${encodeURIComponent(convId)}/messages?locationId=${encodeURIComponent(clientId)}`
       );
-      const messages = data.messages || [];
+      const messages = Array.isArray(data.messages) ? data.messages : [];
 
-      let recordingUrl = '';
-      let transcript = '';
+      // Bug 4: find the TYPE_CALL message first — it carries recording + transcript
+      const callMsg = messages.find(m => m.messageType === 'TYPE_CALL');
 
-      for (const msg of messages) {
-        if (!recordingUrl) {
-          if (msg.meta && msg.meta.recordingUrl) recordingUrl = msg.meta.recordingUrl;
-          if (!recordingUrl && msg.attachments) {
+      // Recording URL: prefer TYPE_CALL meta, then any message meta, then attachments
+      let recordingUrl = callMsg?.meta?.recordingUrl || '';
+      if (!recordingUrl) {
+        for (const msg of messages) {
+          if (msg.meta?.recordingUrl) { recordingUrl = msg.meta.recordingUrl; break; }
+          if (msg.attachments) {
             for (const att of msg.attachments) {
               if (att.url) { recordingUrl = att.url; break; }
             }
           }
-        }
-        if (!transcript && msg.meta && msg.meta.transcriptionText) {
-          transcript = msg.meta.transcriptionText;
+          if (recordingUrl) break;
         }
       }
+
+      // Transcript: prefer TYPE_CALL meta.transcriptionText, then TYPE_CALL body,
+      // then any TYPE_ACTIVITY_CONTACT message body
+      let transcript = callMsg?.meta?.transcriptionText || callMsg?.body || '';
+      if (!transcript) {
+        const actMsg = messages.find(m =>
+          m.messageType === 'TYPE_ACTIVITY_CONTACT' && m.body && m.body.trim()
+        );
+        if (actMsg) transcript = actMsg.body;
+      }
+      if (!transcript) {
+        // last resort: any message with transcriptionText
+        for (const msg of messages) {
+          if (msg.meta?.transcriptionText) { transcript = msg.meta.transcriptionText; break; }
+        }
+      }
+
+      // Cache duration for the call row if we have it
+      const dur = callMsg?.meta?.callDuration || 0;
+      if (dur > 0) appData.callDurations[convId] = dur;
 
       if (recordingUrl) {
         $audioEl.src = `/api/recording?url=${encodeURIComponent(recordingUrl)}&locationId=${encodeURIComponent(clientId)}`;

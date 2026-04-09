@@ -357,12 +357,26 @@ app.get('/api/recording', async (req, res) => {
     const clientsData = await loadClientsConfig();
     const client = findClient(clientsData.clients, locationId);
     const apiKey = resolveLocationKey(client);
-    const audioRes = await fetch(url, { headers: locationHeaders(apiKey) });
-    if (!audioRes.ok) {
+
+    const fetchHeaders = { ...locationHeaders(apiKey) };
+    const rangeHeader = req.headers['range'];
+    if (rangeHeader) fetchHeaders['Range'] = rangeHeader;
+
+    const audioRes = await fetch(url, { headers: fetchHeaders });
+    if (!audioRes.ok && audioRes.status !== 206) {
       return res.status(audioRes.status).json({ error: 'Failed to fetch recording' });
     }
+
     const contentType = audioRes.headers.get('content-type') || 'audio/mpeg';
+    const contentLength = audioRes.headers.get('content-length');
+    const contentRange = audioRes.headers.get('content-range');
+
     res.setHeader('Content-Type', contentType);
+    res.setHeader('Accept-Ranges', 'bytes');
+    if (contentLength) res.setHeader('Content-Length', contentLength);
+    if (contentRange) res.setHeader('Content-Range', contentRange);
+
+    res.status(audioRes.status);
     audioRes.body.pipe(res);
   } catch (err) {
     console.error('GET /api/recording error:', err.message);
