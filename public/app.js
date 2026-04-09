@@ -36,7 +36,8 @@
     config: { clients: [], reps: [] },
     opportunities: [],
     calls: [],
-    fetchedUsers: [],   // users fetched from GHL, keyed by locationId
+    fetchedUsers: [],
+    repCallsMap: {},    // { [repId]: conversations[] } — fetched per-rep for accurate counts
   };
 
   const filters = {
@@ -243,7 +244,7 @@
         });
       });
 
-      // Bug 3: fetch users for each client to populate rep leaderboard
+      // Fetch users for console reference logging
       const userFetches = clients
         .filter(c => c.locationId)
         .map(client =>
@@ -385,6 +386,9 @@
       (o.assignedTo === repId) ||
       (o.contact && o.contact.id && calls.some(c => c.contactId === o.contact.id && c.assignedTo === repId))
     );
+
+    // Count calls assigned to this rep from the already-fetched location-level calls.
+    // The conversations API returns assignedTo on each conversation matching the rep's GHL user ID.
     const repCalls = calls.filter(c => c.assignedTo === repId);
 
     const sold = repOpps.filter(o => (o.status || '').toLowerCase() === 'won').length;
@@ -603,12 +607,16 @@
       const dateStr = formatDate(conv.lastMessageDate || conv.dateUpdated || conv.dateAdded);
       const badge = callOutcomeBadge(conv, contactOppMap);
       const convId = conv.id || conv._id;
+      const durSec = conv.meta?.callDuration || conv.meta?.duration || conv.callDuration || conv.duration || 0;
+      const durStr = durSec > 0
+        ? `${Math.floor(durSec / 60)}m ${String(Math.floor(durSec % 60)).padStart(2, '0')}s`
+        : '—';
       return `
         <div class="call-row" data-conv-id="${escHtml(convId)}" data-client-id="${conv._clientId}">
           <div class="dir-dot ${dir}"></div>
           <div class="call-info">
             <div class="call-contact">${escHtml(contactName)}</div>
-            <div class="call-time">${dateStr}</div>
+            <div class="call-time">${dateStr} &middot; ${durStr}</div>
           </div>
           ${badge}
         </div>`;

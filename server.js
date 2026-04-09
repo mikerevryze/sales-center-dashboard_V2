@@ -268,7 +268,12 @@ app.get('/api/conversations/:conversationId/messages', async (req, res) => {
       `${GHL_API}/conversations/${conversationId}/messages`,
       locationHeaders(apiKey)
     );
-    res.json(data);
+    // Normalize: always return { messages: [] } regardless of GHL response shape
+    const messages = Array.isArray(data) ? data
+      : Array.isArray(data?.messages) ? data.messages
+      : Array.isArray(data?.items) ? data.items
+      : [];
+    res.json({ messages });
   } catch (err) {
     console.error('GET /api/conversations/:id/messages error:', err.message);
     res.status(err.status || 500).json({ error: err.message });
