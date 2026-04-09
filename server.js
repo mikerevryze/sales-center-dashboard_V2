@@ -255,6 +255,39 @@ app.get('/api/debug/calls/:locationId', async (req, res) => {
   }
 });
 
+// ─── GET /api/debug/callsonly/:locationId ────────────────────────────────────
+// Tries three different GHL endpoints to find which one returns actual call data.
+app.get('/api/debug/callsonly/:locationId', async (req, res) => {
+  try {
+    const { locationId } = req.params;
+    const clientsData = await loadClientsConfig();
+    const client = findClient(clientsData.clients, locationId);
+    const apiKey = resolveLocationKey(client);
+    const locHeaders = locationHeaders(apiKey);
+
+    const tryFetch = async (url, extraHeaders = {}) => {
+      try {
+        const r = await fetch(url, { headers: { ...locHeaders, ...extraHeaders } });
+        const data = await r.json();
+        return { status: r.status, data };
+      } catch (e) {
+        return { error: e.message };
+      }
+    };
+
+    const [callsEndpoint, conversationsSearch, v1Endpoint] = await Promise.all([
+      tryFetch(`${GHL_API}/calls/?locationId=${locationId}&limit=100`),
+      tryFetch(`${GHL_API}/conversations/search?locationId=${locationId}&messageTypes[]=TYPE_CALL&limit=100`),
+      tryFetch(`https://rest.gohighlevel.com/v1/conversations/?locationId=${locationId}&type=TYPE_CALL&limit=100`),
+    ]);
+
+    res.json({ calls_endpoint: callsEndpoint, conversations_search: conversationsSearch, v1_endpoint: v1Endpoint });
+  } catch (err) {
+    console.error('GET /api/debug/callsonly error:', err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
 // ─── GET /api/debug/messages/:conversationId ─────────────────────────────────
 // Returns raw GHL messages response with no modification, for debugging field shape.
 app.get('/api/debug/messages/:conversationId', async (req, res) => {
