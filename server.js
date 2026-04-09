@@ -171,63 +171,86 @@ app.get('/api/locations/:locationId/calls', async (req, res) => {
       Version: '2021-07-28',
     };
 
-    // Fetch messages for a conversation with one 429-retry
-    const fetchMessages = async (convId) => {
-      const url = `${GHL_API}/conversations/${convId}/messages`;
-      let res = await fetch(url, { headers: callHeaders });
-      if (res.status === 429) {
-        await sleep(2000);
-        res = await fetch(url, { headers: callHeaders });
-      }
-      if (!res.ok) throw new Error(`GHL ${res.status}`);
-      const data = await res.json();
-      return Array.isArray(data.messages) ? data.messages
-        : Array.isArray(data.items) ? data.items
-        : Array.isArray(data) ? data : [];
-    };
+    const shapeCallObject = (msg, conv) => ({
+      conversationId: conv ? conv.id : (msg.conversationId || null),
+      messageId: msg.id || msg.messageId || null,
+      contactName: conv ? (conv.contactName || conv.fullName || conv.phone || null) : null,
+      contactId: conv ? (conv.contactId || null) : (msg.contactId || null),
+      userId: msg.userId || (conv ? conv.assignedTo : null) || null,
+      phone: conv ? (conv.phone || conv.contactPhone || null) : null,
+      direction: (msg.direction || (conv ? conv.lastMessageDirection : '') || '').toLowerCase(),
+      dateAdded: msg.dateAdded || msg.createdAt || (conv ? conv.lastMessageDate : null) || null,
+      duration: msg.meta?.call?.duration ?? msg.meta?.callDuration ?? 0,
+      status: msg.meta?.call?.status || msg.meta?.callStatus || msg.status || null,
+      locationId,
+    });
 
-    // Step 1: paginate conversations filtered to lastMessageType=TYPE_CALL (limit 50)
+    let callObjects = [];
+
+    // ── Path A: message search endpoint (single API call, most efficient) ──
+    try {
+      const msgSearchUrl = `${GHL_API}/conversations/messages/search?locationId=${locationId}&messageType=TYPE_CALL&limit=50&sortBy=dateAdded&sortOrder=desc`;
+      const msgSearchRes = await fetch(msgSearchUrl, { headers: callHeaders });
+
+      if (msgSearchRes.ok) {
+        const msgData = await msgSearchRes.json();
+        const messages = Array.isArray(msgData.messages) ? msgData.messages
+          : Array.isArray(msgData.items) ? msgData.items
+          : Array.isArray(msgData.data) ? msgData.data : [];
+
+        if (messages.length > 0) {
+          callObjects = messages
+            .filter(m => m.type === 1 || m.messageType === 'TYPE_CALL')
+            .map(m => shapeCallObject(m, null));
+
+          const responseData = { calls: callObjects, total: callObjects.length, source: 'message_search' };
+          callsCache.set(locationId, { data: responseData, timestamp: Date.now() });
+          return res.json(responseData);
+        }
+      }
+      // Fall through to Path B if 404, empty, or any non-ok response
+    } catch (_) {
+      // Fall through to Path B
+    }
+
+    // ── Path B: conversation search + sequential message fetch (fallback) ──
     const allConvs = [];
     let page = 1;
     while (true) {
-      const url = `${GHL_API}/conversations/search?locationId=${locationId}&lastMessageType=TYPE_CALL&limit=50&sortBy=last_message_date&sortOrder=desc&page=${page}`;
+      const url = `${GHL_API}/conversations/search?locationId=${locationId}&lastMessageType=TYPE_CALL&limit=25&sortBy=last_message_date&sortOrder=desc&page=${page}`;
       const data = await ghlGet(url, callHeaders);
       const convs = data.conversations || [];
       allConvs.push(...convs);
       const meta = data.meta || {};
-      const hasMore = convs.length === 50 && (meta.total ? allConvs.length < meta.total : true);
+      const hasMore = convs.length === 25 && (meta.total ? allConvs.length < meta.total : true);
       page++;
       if (!hasMore || page > 10) break;
     }
 
-    // Step 2: fetch messages sequentially with 200ms delay between each
-    const callObjects = [];
     for (const conv of allConvs) {
       try {
-        const messages = await fetchMessages(conv.id);
-        const callMsg = messages.find(m => m.type === 1 || m.messageType === 'TYPE_CALL');
-        if (callMsg) {
-          callObjects.push({
-            conversationId: conv.id,
-            messageId: callMsg.id || callMsg.messageId || null,
-            contactName: conv.contactName || conv.fullName || conv.phone || null,
-            contactId: conv.contactId || null,
-            userId: callMsg.userId || conv.assignedTo || null,
-            phone: conv.phone || conv.contactPhone || null,
-            direction: (callMsg.direction || conv.lastMessageDirection || '').toLowerCase(),
-            dateAdded: callMsg.dateAdded || callMsg.createdAt || conv.lastMessageDate || null,
-            duration: callMsg.meta?.call?.duration ?? callMsg.meta?.callDuration ?? 0,
-            status: callMsg.meta?.call?.status || callMsg.meta?.callStatus || callMsg.status || null,
-            locationId,
-          });
+        const msgUrl = `${GHL_API}/conversations/${conv.id}/messages`;
+        let msgRes = await fetch(msgUrl, { headers: callHeaders });
+        if (msgRes.status === 429) {
+          await sleep(2000);
+          msgRes = await fetch(msgUrl, { headers: callHeaders });
         }
+        if (!msgRes.ok) { await sleep(300); continue; }
+
+        const msgData = await msgRes.json();
+        const messages = Array.isArray(msgData.messages) ? msgData.messages
+          : Array.isArray(msgData.items) ? msgData.items
+          : Array.isArray(msgData) ? msgData : [];
+
+        const callMsg = messages.find(m => m.type === 1 || m.messageType === 'TYPE_CALL');
+        if (callMsg) callObjects.push(shapeCallObject(callMsg, conv));
       } catch (_) {
-        // skip conversations that fail
+        // skip
       }
-      await sleep(200);
+      await sleep(300);
     }
 
-    const responseData = { calls: callObjects, total: callObjects.length };
+    const responseData = { calls: callObjects, total: callObjects.length, source: 'conversation_fallback' };
     callsCache.set(locationId, { data: responseData, timestamp: Date.now() });
     res.json(responseData);
   } catch (err) {
@@ -286,6 +309,32 @@ app.get('/api/debug/calls/:locationId', async (req, res) => {
   } catch (err) {
     console.error('GET /api/debug/calls error:', err.message);
     res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/debug/msgsearch/:locationId ────────────────────────────────────
+// Tests the message search endpoint and returns the raw response.
+app.get('/api/debug/msgsearch/:locationId', async (req, res) => {
+  try {
+    const { locationId } = req.params;
+    const clientsData = await loadClientsConfig();
+    const client = findClient(clientsData.clients, locationId);
+    const apiKey = resolveLocationKey(client);
+
+    const callHeaders = {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      Version: '2021-07-28',
+    };
+
+    const url = `${GHL_API}/conversations/messages/search?locationId=${locationId}&messageType=TYPE_CALL&limit=50&sortBy=dateAdded&sortOrder=desc`;
+    const raw = await fetch(url, { headers: callHeaders });
+    const data = await raw.json();
+
+    res.json({ status: raw.status, url, data });
+  } catch (err) {
+    console.error('GET /api/debug/msgsearch error:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
