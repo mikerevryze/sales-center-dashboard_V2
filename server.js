@@ -15,6 +15,11 @@ const AGENCY_KEY = process.env.GHL_AGENCY_API_KEY;
 const CLIENTS_CONFIG = path.join(__dirname, 'clients-config.json');
 const REPS_CONFIG = path.join(__dirname, 'reps-config.json');
 
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// 5-minute in-memory cache for calls results per locationId
+const callsCache = new Map(); // locationId -> { data, timestamp }
+
 function agencyHeaders() {
   return {
     Authorization: `Bearer ${AGENCY_KEY}`,
@@ -145,10 +150,17 @@ app.get('/api/locations/:locationId/opportunities', async (req, res) => {
 
 // ─── GET /api/locations/:locationId/calls ────────────────────────────────────
 // Fetches conversations where lastMessageType=TYPE_CALL, then fetches messages
-// for each to extract the TYPE_CALL message and its meta fields.
+// for each sequentially (200ms gap) with one 429-retry. Results cached 5 min.
 app.get('/api/locations/:locationId/calls', async (req, res) => {
   try {
     const { locationId } = req.params;
+
+    // Serve from cache if fresh (< 5 minutes)
+    const cached = callsCache.get(locationId);
+    if (cached && (Date.now() - cached.timestamp) < 5 * 60 * 1000) {
+      return res.json(cached.data);
+    }
+
     const clientsData = await loadClientsConfig();
     const client = findClient(clientsData.clients, locationId);
     const apiKey = resolveLocationKey(client);
@@ -159,36 +171,43 @@ app.get('/api/locations/:locationId/calls', async (req, res) => {
       Version: '2021-07-28',
     };
 
-    // Step 1: paginate conversations filtered to lastMessageType=TYPE_CALL
+    // Fetch messages for a conversation with one 429-retry
+    const fetchMessages = async (convId) => {
+      const url = `${GHL_API}/conversations/${convId}/messages`;
+      let res = await fetch(url, { headers: callHeaders });
+      if (res.status === 429) {
+        await sleep(2000);
+        res = await fetch(url, { headers: callHeaders });
+      }
+      if (!res.ok) throw new Error(`GHL ${res.status}`);
+      const data = await res.json();
+      return Array.isArray(data.messages) ? data.messages
+        : Array.isArray(data.items) ? data.items
+        : Array.isArray(data) ? data : [];
+    };
+
+    // Step 1: paginate conversations filtered to lastMessageType=TYPE_CALL (limit 50)
     const allConvs = [];
     let page = 1;
     while (true) {
-      const url = `${GHL_API}/conversations/search?locationId=${locationId}&lastMessageType=TYPE_CALL&limit=100&sortBy=last_message_date&sortOrder=desc&page=${page}`;
+      const url = `${GHL_API}/conversations/search?locationId=${locationId}&lastMessageType=TYPE_CALL&limit=50&sortBy=last_message_date&sortOrder=desc&page=${page}`;
       const data = await ghlGet(url, callHeaders);
       const convs = data.conversations || [];
       allConvs.push(...convs);
       const meta = data.meta || {};
-      const hasMore = convs.length === 100 && (meta.total ? allConvs.length < meta.total : true);
+      const hasMore = convs.length === 50 && (meta.total ? allConvs.length < meta.total : true);
       page++;
       if (!hasMore || page > 10) break;
     }
 
-    // Step 2: fetch messages for each conversation in batches of 10
+    // Step 2: fetch messages sequentially with 200ms delay between each
     const callObjects = [];
-    for (let i = 0; i < allConvs.length; i += 10) {
-      const batch = allConvs.slice(i, i + 10);
-      const batchResults = await Promise.all(batch.map(async conv => {
-        try {
-          const msgRes = await fetch(`${GHL_API}/conversations/${conv.id}/messages`, { headers: callHeaders });
-          const msgData = await msgRes.json();
-          const messages = Array.isArray(msgData.messages) ? msgData.messages
-            : Array.isArray(msgData.items) ? msgData.items
-            : Array.isArray(msgData) ? msgData : [];
-
-          const callMsg = messages.find(m => m.type === 1 || m.messageType === 'TYPE_CALL');
-          if (!callMsg) return null;
-
-          return {
+    for (const conv of allConvs) {
+      try {
+        const messages = await fetchMessages(conv.id);
+        const callMsg = messages.find(m => m.type === 1 || m.messageType === 'TYPE_CALL');
+        if (callMsg) {
+          callObjects.push({
             conversationId: conv.id,
             messageId: callMsg.id || callMsg.messageId || null,
             contactName: conv.contactName || conv.fullName || conv.phone || null,
@@ -200,16 +219,17 @@ app.get('/api/locations/:locationId/calls', async (req, res) => {
             duration: callMsg.meta?.call?.duration ?? callMsg.meta?.callDuration ?? 0,
             status: callMsg.meta?.call?.status || callMsg.meta?.callStatus || callMsg.status || null,
             locationId,
-          };
-        } catch (_) {
-          return null;
+          });
         }
-      }));
-      batchResults.forEach(c => { if (c) callObjects.push(c); });
-      if (i + 10 < allConvs.length) await new Promise(r => setTimeout(r, 300));
+      } catch (_) {
+        // skip conversations that fail
+      }
+      await sleep(200);
     }
 
-    res.json({ calls: callObjects, total: callObjects.length });
+    const responseData = { calls: callObjects, total: callObjects.length };
+    callsCache.set(locationId, { data: responseData, timestamp: Date.now() });
+    res.json(responseData);
   } catch (err) {
     console.error('GET /api/locations/:id/calls error:', err.message);
     res.status(err.status || 500).json({ error: err.message });
