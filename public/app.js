@@ -248,10 +248,11 @@
       });
   }
 
-  // Fix 2: Priority attribution — assignedTo → followers[0] → contactId cross-ref → null
+  // Sales attribution: assignedTo ONLY → contactId cross-ref → null
+  // Followers array is intentionally excluded — GHL auto-populates it for every lead,
+  // which massively inflates sold counts. Only use for pipeline activity display.
   function getOppRepId(opp) {
     if (opp.assignedTo) return opp.assignedTo;
-    if (Array.isArray(opp.followers) && opp.followers.length) return opp.followers[0];
     if (opp.contactId && appData.contactCallRepMap[opp.contactId]) {
       return appData.contactCallRepMap[opp.contactId];
     }
@@ -1421,7 +1422,7 @@
       });
       const maxCount = Math.max(...stages.map(([, c]) => c), 1);
       pane.innerHTML = `
-        <div class="rp-funnel-header">${total} total opportunities</div>
+        <div class="rp-funnel-header">${total} opportunities · Pipeline activity (assigned + following)</div>
         <div class="rp-funnel">
           ${stages.map(([name, count]) => {
             const pct = Math.round((count / maxCount) * 100);

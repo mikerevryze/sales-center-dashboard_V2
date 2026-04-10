@@ -1060,6 +1060,14 @@ app.get('/api/reps/:repId/pipeline-stats', async (req, res) => {
     const cachedEntry = oppsCache.get(cacheKey);
     const opps = cachedEntry ? (cachedEntry.data.opportunities || []) : [];
 
+    // Build stageId → stageName lookup from all cached opps
+    const stageNameMap = {};
+    opps.forEach(o => {
+      if (o.pipelineStageId && o.pipelineStageName) {
+        stageNameMap[o.pipelineStageId] = o.pipelineStageName;
+      }
+    });
+
     const repOpps = opps.filter(o =>
       o.assignedTo === repId ||
       (Array.isArray(o.followers) && o.followers.includes(repId))
@@ -1067,11 +1075,12 @@ app.get('/api/reps/:repId/pipeline-stats', async (req, res) => {
 
     const stageCounts = {};
     repOpps.forEach(o => {
-      const name = o.pipelineStageName || o.pipelineStageId || 'Unknown';
+      // Resolve stage name: use pipelineStageName first, then stageNameMap, then ID
+      const name = o.pipelineStageName || stageNameMap[o.pipelineStageId] || o.pipelineStageId || 'Unknown';
       stageCounts[name] = (stageCounts[name] || 0) + 1;
     });
 
-    res.json({ stageCounts, total: repOpps.length });
+    res.json({ stageCounts, total: repOpps.length, stageNameMap });
   } catch (err) {
     console.error('GET /api/reps/:repId/pipeline-stats error:', err.message);
     res.status(err.status || 500).json({ error: err.message });

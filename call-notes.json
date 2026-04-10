@@ -59,5 +59,188 @@
       ]
     },
     "aiAnalyzedAt": "2026-04-09T23:56:06.551Z"
+  },
+  "CsHoFwWCaevM5efNvOcO": {
+    "conversationId": "imktcgavIUKFyKzHoAgW",
+    "aiAnalysis": {
+      "score": 8,
+      "summary": "Stefanie delivered a solid sales call with strong discovery, clear value presentation, and a successful close. She effectively positioned the founding membership urgency and locked-in pricing, which directly led to the prospect choosing the unlimited plan. Minor improvements could be made in opening professionalism and addressing the vertigo concern more empathetically.",
+      "keyMoments": [
+        {
+          "type": "Discovery",
+          "description": "Rep asked about Pilates interest and learned prospect has vertigo concerns and wants to return to consistent practice—previously went 2 years straight."
+        },
+        {
+          "type": "Pitch",
+          "description": "Rep clearly explained Strong Pilates differentiator (cardio-infused, 3-in-1 machine) and presented founding membership pricing with urgency (price increases tomorrow, locked-in rate forever)."
+        },
+        {
+          "type": "Objection Handling",
+          "description": "When prospect asked about price increases after signup, rep confidently clarified the rate is locked in permanently as a founder benefit."
+        },
+        {
+          "type": "Close Attempt",
+          "description": "Prospect committed to unlimited membership at $219/month. Rep smoothly transitioned to payment processing and onboarding instructions."
+        }
+      ],
+      "coachingTip": "Great job closing! To improve: acknowledge health concerns more empathetically (e.g., 'I'm so glad you're managing the vertigo—our instructors will work with you on balance safely') and tighten your opening to sound more polished and confident from the start.",
+      "labeledTranscript": [
+        {
+          "speaker": "Rep",
+          "text": "So what is the difference is a lot of places don't do the cardio. So this is cardio infused. The machine is a three in one. It's the reformer and the cardio aspect of it."
+        },
+        {
+          "speaker": "Lead",
+          "text": "I would for sure go at least twice a week."
+        },
+        {
+          "speaker": "Rep",
+          "text": "So what I would recommend is we have an unlimited. When the studio opens, it's originally $339, and then right now, it's $229, and I can drop that down to $219 for you."
+        },
+        {
+          "speaker": "Lead",
+          "text": "When does that price go up? Like, does it go up after a year?"
+        },
+        {
+          "speaker": "Rep",
+          "text": "No. That is a locked in rate for you. Because you're a founder, that rate will never change. You could have the membership for ten years, and then that price will never change."
+        },
+        {
+          "speaker": "Lead",
+          "text": "Okay. Well, I'll do the unlimited."
+        },
+        {
+          "speaker": "Rep",
+          "text": "Perfect. We can get that taken care of. Let me go ahead and..."
+        },
+        {
+          "speaker": "Rep",
+          "text": "You are all set to go. Download the strong Pilates app. That is gonna be your best friend."
+        }
+      ]
+    },
+    "aiAnalyzedAt": "2026-04-10T01:40:47.109Z"
+  },
+  "u5hABveDJ0HTKR9vOTfG": {
+    "conversationId": "zUGoVzodzH14BrsKQq9w",
+    "aiAnalysis": {
+      "score": 6,
+      "summary": "Jon handled a skeptical lead professionally and built trust through transparency about the process, pricing, and risk-free trial. He addressed multiple objections about legitimacy and contract visibility, but failed to close the sale, instead allowing the lead to defer the decision to tomorrow without creating sufficient urgency around the founder's pricing tiers.",
+      "keyMoments": [
+        {
+          "type": "Discovery",
+          "description": "Rep asked about class preferences and explored pricing options (standard vs. 'nice price'), showing some rapport-building skills."
+        },
+        {
+          "type": "Objection Handling",
+          "description": "Effectively addressed scam concerns by explaining email confirmations, recorded calls, and offering to personally handle the refund if needed within 4 days."
+        },
+        {
+          "type": "Objection Handling",
+          "description": "Handled contract/agreement objection by explaining the payment-then-documentation process and emphasizing the risk-free 4-day trial period."
+        },
+        {
+          "type": "Close Attempt",
+          "description": "Attempted to close by mentioning tier three urgency and limited slots, but when lead requested time to think, Rep immediately agreed to reschedule instead of trying a trial close or reinforcing scarcity."
+        }
+      ],
+      "coachingTip": "When a lead asks for time to 'think it over,' acknowledge the concern but reinforce the urgency and risk-free nature before agreeing to reschedule. Try: 'I totally understand—what specific questions can I answer right now so you feel confident? Remember, tier two pricing is going fast and you have a 4-day money-back guarantee.' This keeps control while still being respectful.",
+      "labeledTranscript": [
+        {
+          "speaker": "Lead",
+          "text": "I mean, it's just weird to ask someone to, like, pay money and sign something without showing them a contract."
+        },
+        {
+          "speaker": "Rep",
+          "text": "Because we will process the payment, then immediately, right after, you would get all the documentations and everything sent over to you."
+        },
+        {
+          "speaker": "Lead",
+          "text": "And you're sure if I don't like it, I can cancel and I get a refund?"
+        },
+        {
+          "speaker": "Rep",
+          "text": "1000%. You can call me directly, and I'll do it myself."
+        },
+        {
+          "speaker": "Lead",
+          "text": "It just feels like such a risk... it feels weird for me to give my credit card information out."
+        },
+        {
+          "speaker": "Rep",
+          "text": "That's why we send the email confirmations. You'll be getting emails, and you'll be getting welcome text messages and everything like that."
+        },
+        {
+          "speaker": "Lead",
+          "text": "Can I take a minute to watch some Instagram videos and schedule another call for tomorrow? And then I'll make the payment."
+        },
+        {
+          "speaker": "Rep",
+          "text": "Sure. Tomorrow at the same time?"
+        }
+      ]
+    },
+    "aiAnalyzedAt": "2026-04-10T01:44:07.591Z"
+  },
+  "fh9NADyvaVjfXFjStjHV": {
+    "conversationId": "jkL5VuQFIyzdIunaDrJk",
+    "aiAnalysis": {
+      "score": 9,
+      "summary": "Excellent call with strong discovery, natural rapport building, and a successful close. Jon identified Nicole's situation (new mom looking to restart fitness), addressed her needs perfectly, handled pricing smoothly with a discount hook, and closed the sale confidently. Minor deduction for a slightly prolonged payment collection process, but overall a textbook presale call.",
+      "keyMoments": [
+        {
+          "type": "Discovery",
+          "description": "Jon asked about Nicole's current fitness routine and learned she's a new mom (2 kids) looking to get back into Pilates after a break—perfect timing for a June opening."
+        },
+        {
+          "type": "Pitch",
+          "description": "Jon clearly explained the founding membership benefits (priority booking, VIP treatment, lower pricing) and differentiated the studio with reformer attachments and cardio options."
+        },
+        {
+          "type": "Objection Handling",
+          "description": "When Nicole asked about trying it beforehand, Jon smoothly pivoted to the 4-day grace period/refund policy, turning a potential objection into a trial opportunity."
+        },
+        {
+          "type": "Close Attempt",
+          "description": "Jon used a 'nice person' discount ($30 off unlimited to $229) to create urgency and exclusivity, leading Nicole to say 'I feel like I wanna go ahead with it' and completing the payment on the spot."
+        }
+      ],
+      "coachingTip": "Outstanding work, Jon! To hit a perfect 10, streamline the payment collection—have the prospect confirm card details are ready before starting entry to avoid dead air. Also, confirm email receipt before moving to payment to prevent tech friction from disrupting momentum.",
+      "labeledTranscript": [
+        {
+          "speaker": "Rep",
+          "text": "Hi, Nicole? This is John. I see that you looked into us, and I'm pretty sure you wanna know what we got going on over in West Point."
+        },
+        {
+          "speaker": "Lead",
+          "text": "Yeah. And it's, like, right by, like, Landero. Right? We live in Oak Park just up Landero, so it's pretty close."
+        },
+        {
+          "speaker": "Rep",
+          "text": "So are you doing any type of pilates or anything like that right now?"
+        },
+        {
+          "speaker": "Lead",
+          "text": "I'm not. I used to do a degree, like, three or four times a week. But I had my daughter two years ago, and I just had another kid, like, a couple weeks ago. So I'm trying to find something to, like, consistently get back into."
+        },
+        {
+          "speaker": "Rep",
+          "text": "Now the great thing about being a founder is that founders get priority when it comes to booking the classes. And how much is the membership? We have a four pack at $99 and unlimited at $259. And for those who are actually nice to me, I can discount it even further."
+        },
+        {
+          "speaker": "Lead",
+          "text": "Is there a way or, like, somewhere else to try it beforehand?"
+        },
+        {
+          "speaker": "Rep",
+          "text": "We have a grace period. If you come in, try our class, and if it's not for you, you have up to four days to cancel the membership, and we'll actually refund you your initial payment back."
+        },
+        {
+          "speaker": "Lead",
+          "text": "Okay. Perfect. So, yeah, I feel like I wanna go ahead with it."
+        }
+      ]
+    },
+    "aiAnalyzedAt": "2026-04-10T01:45:35.439Z"
   }
 }
