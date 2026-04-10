@@ -248,11 +248,13 @@
       });
   }
 
-  // Sales attribution: assignedTo ONLY → contactId cross-ref → null
-  // Followers array is intentionally excluded — GHL auto-populates it for every lead,
-  // which massively inflates sold counts. Only use for pipeline activity display.
+  // Sales attribution priority (confirmed from raw GHL data):
+  //   1. assignedTo — explicit rep assignment
+  //   2. followers[0] — used when assignedTo is null (GHL single-follower attribution)
+  //   3. contactId cross-ref — calls cache lookup as last fallback
   function getOppRepId(opp) {
     if (opp.assignedTo) return opp.assignedTo;
+    if (Array.isArray(opp.followers) && opp.followers.length) return opp.followers[0];
     if (opp.contactId && appData.contactCallRepMap[opp.contactId]) {
       return appData.contactCallRepMap[opp.contactId];
     }

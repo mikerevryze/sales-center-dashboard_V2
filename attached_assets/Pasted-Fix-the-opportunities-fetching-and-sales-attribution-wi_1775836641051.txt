@@ -1,0 +1,48 @@
+Fix the opportunities fetching and sales attribution with exact logic confirmed from raw data.
+Confirmed data structure:
+
+status: "won" = closed won sale
+assignedTo = repId string OR null
+followers = array of repId strings (used when assignedTo is null)
+monetaryValue = sale value, often 0
+lastStageChangeAt = ISO date when stage last changed
+
+Fix 1 — Paginate ALL opportunities:
+The current fetch only returns the first page. GHL opportunities search paginates. Fix the opportunities endpoint to fetch ALL pages:
+javascriptlet allOpps = [];
+let page = 1;
+let hasMore = true;
+while (hasMore) {
+  const res = await ghlGet(
+    `https://services.leadconnectorhq.com/opportunities/search?location_id=${locationId}&pipeline_id=${pipelineId}&limit=100&page=${page}`,
+    locationKey
+  );
+  const opps = res.opportunities || [];
+  allOpps = allOpps.concat(opps);
+  hasMore = opps.length === 100;
+  page++;
+  if (hasMore) await sleep(300);
+}
+Return all opps. Add total count and won count to response.
+Fix 2 — Sales attribution priority:
+Count a won opp as a rep's sale using this exact priority:
+
+If status === 'won' AND assignedTo === repId → rep's sale
+If status === 'won' AND assignedTo === null AND followers array includes repId → rep's sale
+Otherwise → unattributed sale
+
+Apply this same logic everywhere: Command Center leaderboard, rep profile sold count, Weekly SPIFF.
+Fix 3 — Pipeline funnel stage names:
+The pipeline funnel in rep profile shows raw UUIDs. Fix it by building a stageId→stageName map from clients-config.json:
+javascriptconst stageMap = {};
+config.clients.forEach(client => {
+  client.pipelines.forEach(pipeline => {
+    (pipeline.stages || []).forEach(stage => {
+      stageMap[stage.id] = stage.name;
+    });
+  });
+});
+Use stageMap[opp.pipelineStageId] || 'Unknown Stage' when displaying pipeline funnel bars.
+Fix 4 — Add a /debug-wonopps endpoint:
+Returns total won opp count across all pages for location 9oW28j2SxdPAmUhO5MDI pipeline udyl3lJvKs31tt6O01SZ, broken down by assignedTo value, so we can verify the real numbers.
+Do not change anything else.

@@ -41,6 +41,29 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const callsCache = new Map(); // locationId -> { data, timestamp }
 // 10-minute in-memory cache for opportunities per locationId
 const oppsCache = new Map(); // locationId -> { data, timestamp }
+// 60-minute in-memory cache for pipeline stage names per locationId
+const stagesCache = new Map(); // locationId -> { map: { stageId: stageName }, timestamp }
+
+// Fetch stageId → stageName map for a location from GHL pipeline API (60-min cache)
+async function fetchStageNameMap(locationId, headers) {
+  const cached = stagesCache.get(locationId);
+  if (cached && (Date.now() - cached.timestamp) < 60 * 60 * 1000) return cached.map;
+  try {
+    const r = await fetch(`${GHL_API}/opportunities/pipelines?locationId=${locationId}`, { headers });
+    if (!r.ok) return {};
+    const body = await r.json();
+    const map = {};
+    (body.pipelines || []).forEach(p => {
+      (p.stages || []).forEach(s => {
+        if (s.id && s.name) map[s.id] = s.name;
+      });
+    });
+    stagesCache.set(locationId, { map, timestamp: Date.now() });
+    return map;
+  } catch {
+    return {};
+  }
+}
 
 function agencyHeaders() {
   return {
@@ -1059,13 +1082,11 @@ app.get('/api/reps/:repId/pipeline-stats', async (req, res) => {
     const cachedEntry = oppsCache.get(cacheKey);
     const opps = cachedEntry ? (cachedEntry.data.opportunities || []) : [];
 
-    // Build stageId → stageName lookup from all cached opps
-    const stageNameMap = {};
-    opps.forEach(o => {
-      if (o.pipelineStageId && o.pipelineStageName) {
-        stageNameMap[o.pipelineStageId] = o.pipelineStageName;
-      }
-    });
+    // Fetch real stage names from GHL pipeline API (60-min cached)
+    const clientsData = await loadClientsConfig();
+    const client = findClient(clientsData.clients, locationId);
+    const apiKey = resolveLocationKey(client);
+    const stageNameMap = await fetchStageNameMap(locationId, locationHeaders(apiKey));
 
     const repOpps = opps.filter(o =>
       o.assignedTo === repId ||
@@ -1074,12 +1095,12 @@ app.get('/api/reps/:repId/pipeline-stats', async (req, res) => {
 
     const stageCounts = {};
     repOpps.forEach(o => {
-      // Resolve stage name: use pipelineStageName first, then stageNameMap, then ID
-      const name = o.pipelineStageName || stageNameMap[o.pipelineStageId] || o.pipelineStageId || 'Unknown';
+      // Priority: GHL pipeline API name → pipelineStageName field → raw ID → Unknown
+      const name = stageNameMap[o.pipelineStageId] || o.pipelineStageName || o.pipelineStageId || 'Unknown';
       stageCounts[name] = (stageCounts[name] || 0) + 1;
     });
 
-    res.json({ stageCounts, total: repOpps.length, stageNameMap });
+    res.json({ stageCounts, total: repOpps.length });
   } catch (err) {
     console.error('GET /api/reps/:repId/pipeline-stats error:', err.message);
     res.status(err.status || 500).json({ error: err.message });
@@ -1168,6 +1189,74 @@ app.get('/debug-opps', async (req, res) => {
       lastStageChangeAt: o.lastStageChangeAt,
     }));
     res.json({ count: opps.length, opps });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── /debug-wonopps — won opp breakdown by assignedTo (no /api/ prefix) ─────
+app.get('/debug-wonopps', async (req, res) => {
+  try {
+    const locationId = '9oW28j2SxdPAmUhO5MDI';
+    const pipelineId = 'udyl3lJvKs31tt6O01SZ';
+    const apiKey = process.env.GHL_KEY_STRONG_PILATES;
+    if (!apiKey) return res.status(500).json({ error: 'GHL_KEY_STRONG_PILATES secret not set' });
+
+    const headers = { Authorization: `Bearer ${apiKey}`, Version: '2021-07-28' };
+    const allOpps = [];
+    let startAfterId = null;
+    let hasMore = true;
+    let page = 0;
+
+    while (hasMore && page < 200) {
+      page++;
+      let url = `${GHL_API}/opportunities/search?location_id=${locationId}&pipeline_id=${pipelineId}&limit=100`;
+      if (startAfterId) url += `&startAfterId=${encodeURIComponent(startAfterId)}`;
+      let attempt = 0, data;
+      while (attempt < 3) {
+        attempt++;
+        const r = await fetch(url, { headers });
+        if (r.status === 429) { await sleep(attempt * 3000); continue; }
+        if (!r.ok) return res.status(r.status).json({ error: `GHL ${r.status}` });
+        data = await r.json();
+        break;
+      }
+      if (!data) break;
+      const opps = data.opportunities || [];
+      allOpps.push(...opps);
+      if (opps.length < 100) { hasMore = false; }
+      else {
+        const meta = data.meta || {};
+        const match = (meta.nextPageUrl || '').match(/startAfterId=([^&]+)/);
+        startAfterId = match ? decodeURIComponent(match[1]) : (opps[opps.length - 1]?.id || null);
+        if (!startAfterId) hasMore = false;
+        else await sleep(150);
+      }
+    }
+
+    const wonOpps = allOpps.filter(o => o.status === 'won');
+    // Break down by assignedTo
+    const byAssigned = {};
+    const followerOnly = [];
+    const unattributed = [];
+    wonOpps.forEach(o => {
+      if (o.assignedTo) {
+        byAssigned[o.assignedTo] = (byAssigned[o.assignedTo] || 0) + 1;
+      } else if (Array.isArray(o.followers) && o.followers.length) {
+        followerOnly.push({ followers: o.followers, monetaryValue: o.monetaryValue, lastStageChangeAt: o.lastStageChangeAt });
+      } else {
+        unattributed.push({ id: o.id, monetaryValue: o.monetaryValue });
+      }
+    });
+
+    res.json({
+      totalOpps: allOpps.length,
+      totalWon: wonOpps.length,
+      wonByAssignedTo: byAssigned,
+      wonFollowerOnlyCount: followerOnly.length,
+      wonFollowerOnlySample: followerOnly.slice(0, 5),
+      wonUnattributedCount: unattributed.length,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
