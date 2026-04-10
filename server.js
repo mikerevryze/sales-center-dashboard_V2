@@ -144,6 +144,61 @@ app.get('/api/config', async (req, res) => {
   }
 });
 
+// ─── Shared opportunity fetcher — cursor-based, 500-opp hard cap ─────────────
+async function fetchAllOpportunities(locationId, pipelineId, headers) {
+  let allOpps = [];
+  let startAfterId = null;
+  let keepGoing = true;
+
+  while (keepGoing) {
+    let url = `${GHL_API}/opportunities/search?location_id=${locationId}&limit=100`;
+    if (pipelineId) url += `&pipeline_id=${encodeURIComponent(pipelineId)}`;
+    if (startAfterId) url += `&startAfterId=${encodeURIComponent(startAfterId)}`;
+
+    // Fetch with 429 retry
+    let data;
+    let attempt = 0;
+    while (attempt < 3) {
+      attempt++;
+      const r = await fetch(url, { headers });
+      if (r.status === 429) {
+        console.warn(`[opps] 429 rate limit, waiting ${attempt * 3000}ms...`);
+        await sleep(attempt * 3000);
+        continue;
+      }
+      if (!r.ok) {
+        const text = await r.text();
+        const err = new Error(`GHL ${r.status}: ${text}`);
+        err.status = r.status;
+        throw err;
+      }
+      data = await r.json();
+      break;
+    }
+    if (!data) break;
+
+    const opps = data.opportunities || [];
+    allOpps = allOpps.concat(opps);
+    console.log(`[opps] ${locationId}${pipelineId ? '/' + pipelineId : ''} fetched ${opps.length}, total: ${allOpps.length}`);
+
+    if (opps.length < 100) {
+      keepGoing = false;
+    } else {
+      startAfterId = opps[opps.length - 1].id;
+      await sleep(300);
+    }
+
+    // Hard safety cap — never fetch more than 500 opps per call
+    if (allOpps.length >= 500) {
+      keepGoing = false;
+    }
+  }
+
+  const wonCount = allOpps.filter(o => o.status === 'won').length;
+  console.log(`[opps] ${locationId}${pipelineId ? '/' + pipelineId : ''} done — ${allOpps.length} total, ${wonCount} won`);
+  return allOpps;
+}
+
 // ─── GET /api/setup/pipelines/:locationId ───────────────────────────────────
 // Dev helper: uses location-specific key to list pipelines for a location
 app.get('/api/setup/pipelines/:locationId', async (req, res) => {
@@ -185,65 +240,7 @@ app.get('/api/locations/:locationId/opportunities', async (req, res) => {
     const apiKey = resolveLocationKey(client);
     const headers = locationHeaders(apiKey);
 
-    let baseUrl = `${GHL_API}/opportunities/search?location_id=${locationId}&limit=100`;
-    if (pipelineId) baseUrl += `&pipeline_id=${encodeURIComponent(pipelineId)}`;
-
-    const allOpps = [];
-    let startAfterId = null;
-    let hasMore = true;
-    let safetyCount = 0;
-
-    while (hasMore && safetyCount < 100) {
-      safetyCount++;
-      let pageUrl = baseUrl;
-      if (startAfterId) pageUrl += `&startAfterId=${encodeURIComponent(startAfterId)}`;
-
-      // Fetch with 429 retry
-      let data;
-      let attempt = 0;
-      while (attempt < 3) {
-        attempt++;
-        const r = await fetch(pageUrl, { headers });
-        if (r.status === 429) {
-          const waitMs = attempt * 3000;
-          console.warn(`[opps] 429 on page ${safetyCount}, waiting ${waitMs}ms (attempt ${attempt})...`);
-          await sleep(waitMs);
-          continue;
-        }
-        if (!r.ok) {
-          const text = await r.text();
-          const err = new Error(`GHL ${r.status}: ${text}`);
-          err.status = r.status;
-          throw err;
-        }
-        data = await r.json();
-        break;
-      }
-      if (!data) break; // exhausted retries
-
-      const opps = data.opportunities || [];
-      allOpps.push(...opps);
-
-      console.log(`[opps] ${locationId} page ${safetyCount}: got ${opps.length}, total so far: ${allOpps.length}`);
-
-      if (opps.length < 100) {
-        hasMore = false;
-      } else {
-        // Extract cursor from nextPageUrl or fall back to last opp id
-        const meta = data.meta || {};
-        const nextUrl = meta.nextPageUrl || '';
-        const match = nextUrl.match(/startAfterId=([^&]+)/);
-        startAfterId = match
-          ? decodeURIComponent(match[1])
-          : (opps.length > 0 ? opps[opps.length - 1].id : null);
-        if (!startAfterId) hasMore = false;
-        else await sleep(100); // small pause between pages to respect rate limits
-      }
-    }
-
-    const wonCount = allOpps.filter(o => o.status === 'won').length;
-    console.log(`[opps] ${locationId} done — ${allOpps.length} total opps, ${wonCount} won`);
-
+    const allOpps = await fetchAllOpportunities(locationId, pipelineId, headers);
     const responseData = { opportunities: allOpps, total: allOpps.length };
     oppsCache.set(cacheKey, { data: responseData, timestamp: Date.now() });
     res.json(responseData);
@@ -1202,60 +1199,28 @@ app.get('/debug-wonopps', async (req, res) => {
     const apiKey = process.env.GHL_KEY_STRONG_PILATES;
     if (!apiKey) return res.status(500).json({ error: 'GHL_KEY_STRONG_PILATES secret not set' });
 
-    const headers = { Authorization: `Bearer ${apiKey}`, Version: '2021-07-28' };
-    const allOpps = [];
-    let startAfterId = null;
-    let hasMore = true;
-    let page = 0;
-
-    while (hasMore && page < 200) {
-      page++;
-      let url = `${GHL_API}/opportunities/search?location_id=${locationId}&pipeline_id=${pipelineId}&limit=100`;
-      if (startAfterId) url += `&startAfterId=${encodeURIComponent(startAfterId)}`;
-      let attempt = 0, data;
-      while (attempt < 3) {
-        attempt++;
-        const r = await fetch(url, { headers });
-        if (r.status === 429) { await sleep(attempt * 3000); continue; }
-        if (!r.ok) return res.status(r.status).json({ error: `GHL ${r.status}` });
-        data = await r.json();
-        break;
-      }
-      if (!data) break;
-      const opps = data.opportunities || [];
-      allOpps.push(...opps);
-      if (opps.length < 100) { hasMore = false; }
-      else {
-        const meta = data.meta || {};
-        const match = (meta.nextPageUrl || '').match(/startAfterId=([^&]+)/);
-        startAfterId = match ? decodeURIComponent(match[1]) : (opps[opps.length - 1]?.id || null);
-        if (!startAfterId) hasMore = false;
-        else await sleep(150);
-      }
-    }
-
+    const headers = locationHeaders(apiKey);
+    const allOpps = await fetchAllOpportunities(locationId, pipelineId, headers);
     const wonOpps = allOpps.filter(o => o.status === 'won');
-    // Break down by assignedTo
-    const byAssigned = {};
-    const followerOnly = [];
-    const unattributed = [];
+
+    const wonByAssignedTo = {};
     wonOpps.forEach(o => {
-      if (o.assignedTo) {
-        byAssigned[o.assignedTo] = (byAssigned[o.assignedTo] || 0) + 1;
-      } else if (Array.isArray(o.followers) && o.followers.length) {
-        followerOnly.push({ followers: o.followers, monetaryValue: o.monetaryValue, lastStageChangeAt: o.lastStageChangeAt });
-      } else {
-        unattributed.push({ id: o.id, monetaryValue: o.monetaryValue });
-      }
+      const key = o.assignedTo || (Array.isArray(o.followers) && o.followers.length ? `follower:${o.followers[0]}` : 'unattributed');
+      wonByAssignedTo[key] = (wonByAssignedTo[key] || 0) + 1;
     });
 
     res.json({
       totalOpps: allOpps.length,
       totalWon: wonOpps.length,
-      wonByAssignedTo: byAssigned,
-      wonFollowerOnlyCount: followerOnly.length,
-      wonFollowerOnlySample: followerOnly.slice(0, 5),
-      wonUnattributedCount: unattributed.length,
+      wonByAssignedTo,
+      first5WonOpps: wonOpps.slice(0, 5).map(o => ({
+        id: o.id,
+        status: o.status,
+        assignedTo: o.assignedTo,
+        followers: o.followers,
+        monetaryValue: o.monetaryValue,
+        lastStageChangeAt: o.lastStageChangeAt,
+      })),
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
