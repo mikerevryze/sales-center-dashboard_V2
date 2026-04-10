@@ -8,7 +8,6 @@ const path = require('path');
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
 const GHL_API = 'https://services.leadconnectorhq.com';
 const AGENCY_KEY = process.env.GHL_AGENCY_API_KEY;
@@ -1146,7 +1145,36 @@ app.post('/api/rep-notes/:repId', async (req, res) => {
   }
 });
 
-// ─── Fallback to index.html ─────────────────────────────────────────────────
+// ─── Standalone debug endpoint (no /api/ prefix — never shadowed by static) ──
+app.get('/debug-opps', async (req, res) => {
+  try {
+    const locationId = '9oW28j2SxdPAmUhO5MDI';
+    const pipelineId = 'udyl3lJvKs31tt6O01SZ';
+    const apiKey = process.env.GHL_KEY_STRONG_PILATES;
+    if (!apiKey) return res.status(500).json({ error: 'GHL_KEY_STRONG_PILATES secret not set' });
+
+    const url = `${GHL_API}/opportunities/search?location_id=${locationId}&pipeline_id=${pipelineId}&limit=10`;
+    const r = await fetch(url, {
+      headers: { Authorization: `Bearer ${apiKey}`, Version: '2021-07-28' }
+    });
+    if (!r.ok) return res.status(r.status).json({ error: `GHL returned ${r.status}`, url });
+    const body = await r.json();
+    const opps = (body.opportunities || []).slice(0, 10).map(o => ({
+      id:                o.id,
+      status:            o.status,
+      assignedTo:        o.assignedTo,
+      followers:         o.followers,
+      monetaryValue:     o.monetaryValue,
+      lastStageChangeAt: o.lastStageChangeAt,
+    }));
+    res.json({ count: opps.length, opps });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Static files + SPA fallback (MUST be last — after all /api/* routes) ───
+app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
