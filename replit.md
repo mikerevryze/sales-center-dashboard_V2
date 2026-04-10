@@ -83,11 +83,20 @@ Internal call center analytics dashboard for Revryze. Tracks sales reps, call re
 
 ## Frontend Architecture (4 Tabs)
 1. **Command Center** — Metrics, Rep Leaderboard, Client Leaderboard with client/pipeline/date filters
-2. **Calls** — Call list (search, rep, client, date, direction filters) + Call Detail panel (audio, transcript, AI analysis, manager notes)
-3. **Conversations** — SMS conversation list + thread view per client
-4. **Weekly SPIFF** — Week-by-week rep rankings by memberships sold
+2. **Calls** — Call list (expanded 2-row filter bar: outcome/duration/AI score/flagged/custom date/clear) + Call Detail panel (audio, transcript, AI analysis, manager notes, flagging)
+3. **Conversations** — SMS list + full chat-bubble thread view (grouped by direction, sender labels, auto-scroll)
+4. **Weekly SPIFF** — Week-by-week rep rankings by memberships sold (filters by `lastStageChangeAt`)
 
 All filtering is done client-side on page load. No extra API calls on filter changes — only on manual Refresh.
+
+## Data Accuracy Rules (GHL field mapping)
+- **Memberships sold**: `status === 'won'` filtered by `lastStageChangeAt` (not `dateAdded`)
+- **Rep attribution priority**: `assignedTo` → `followers[0]` → contactId cross-ref against calls → unattributed
+- **Revenue**: Only sums `monetaryValue > 0`; shows $0 honestly when no values set in GHL
+- **Talk time**: Sums `c.duration || c.meta?.call?.duration` from all calls; formatted as "Xh Ym" or "Ym Ys"
+- **Close rate**: `(won opps ÷ total calls) × 100`; shows "—" and logs warning if > 100% (sanity check)
+- **Rep call counts**: Uses `c.userId` from TYPE_CALL messages matched to `rep.userId`
+- **SPIFF win date**: Uses `lastStageChangeAt` via `getWonDate()` helper
 
 ## GHL API Notes
 - Version header `2021-07-28` required for calls/messages/recording/transcription

@@ -109,6 +109,7 @@
     scoringRubric: { default: '', repOverrides: {} },
     contactWonSet: new Set(),
     allContactOppMap: {},
+    contactCallRepMap: {},
   };
 
   const ccFilters = { clientId: 'all', pipelineId: 'all', days: 30 };
@@ -158,9 +159,12 @@
     return `${m}:${s.toString().padStart(2, '0')}`;
   }
   function fmtDurLong(sec) {
-    if (!sec || !isFinite(sec)) return '0m';
-    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
-    return h ? `${h}h ${m}m` : `${m}m`;
+    if (!sec || !isFinite(sec)) return '0m 0s';
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = Math.floor(sec % 60);
+    if (h) return `${h}h ${m}m`;
+    return `${m}m ${s}s`;
   }
   function parseDate(v) {
     if (!v) return null;
@@ -231,6 +235,29 @@
         appData.contactWonSet.add(o.contactId);
       }
     });
+    buildContactCallRepMap();
+  }
+
+  // Fix 2: Build a contactId → userId map from call data (most recent call's rep wins)
+  function buildContactCallRepMap() {
+    appData.contactCallRepMap = {};
+    [...appData.calls]
+      .sort((a, b) => (parseDate(b.dateAdded) || 0) - (parseDate(a.dateAdded) || 0))
+      .forEach(c => {
+        if (c.contactId && c.userId && !appData.contactCallRepMap[c.contactId]) {
+          appData.contactCallRepMap[c.contactId] = c.userId;
+        }
+      });
+  }
+
+  // Fix 2: Priority attribution — assignedTo → followers[0] → contactId cross-ref → null
+  function getOppRepId(opp) {
+    if (opp.assignedTo) return opp.assignedTo;
+    if (Array.isArray(opp.followers) && opp.followers.length) return opp.followers[0];
+    if (opp.contactId && appData.contactCallRepMap[opp.contactId]) {
+      return appData.contactCallRepMap[opp.contactId];
+    }
+    return null;
   }
 
   function getActiveFilterCount() {
@@ -440,6 +467,19 @@
     });
   }
 
+  // Fix 1: Won opps filtered by lastStageChangeAt (not dateAdded)
+  function filteredWonOpps() {
+    const cutoff = getDateCutoff(ccFilters.days);
+    return appData.opportunities.filter(o => {
+      if ((o.status || '').toLowerCase() !== 'won') return false;
+      if (ccFilters.clientId !== 'all' && o.locationId !== ccFilters.clientId) return false;
+      if (ccFilters.pipelineId !== 'all' && o.pipelineId !== ccFilters.pipelineId) return false;
+      const d = parseDate(o.lastStageChangeAt);
+      if (!d || d < cutoff) return false;
+      return true;
+    });
+  }
+
   function filteredCallsCC() {
     const cutoff = getDateCutoff(ccFilters.days);
     return appData.calls.filter(c => {
@@ -451,39 +491,53 @@
   }
 
   function renderCommandCenter() {
-    const opps = filteredOpps();
-    const calls = filteredCallsCC();
-
-    const wonOpps = opps.filter(o => (o.status || '').toLowerCase() === 'won');
-    const sold = wonOpps.length;
-    const revenue = wonOpps.reduce((s, o) => s + (o.monetaryValue || 0), 0);
+    // Fix 1: Use lastStageChangeAt for won opps; Fix 3: only count monetaryValue > 0
+    const wonOpps    = filteredWonOpps();
+    const calls      = filteredCallsCC();
+    const sold       = wonOpps.length;
+    const revenue    = wonOpps.reduce((s, o) => s + (o.monetaryValue > 0 ? o.monetaryValue : 0), 0);
     const totalCalls = calls.length;
-    const talkSec = calls.reduce((s, c) => s + getCallDuration(c), 0);
-    const closeRate = calls.length ? ((sold / calls.length) * 100).toFixed(1) + '%' : '—';
+    const talkSec    = calls.reduce((s, c) => s + getCallDuration(c), 0);
 
-    $mSold.textContent    = sold;
-    $mRevenue.textContent = fmt$(revenue);
-    $mCalls.textContent   = totalCalls;
-    $mTalktime.textContent= fmtDurLong(talkSec);
-    $mRate.textContent    = closeRate;
+    // Fix 5: Close rate sanity check — cap at 100%
+    let closeRate = '—';
+    if (totalCalls > 0) {
+      const raw = (sold / totalCalls) * 100;
+      if (raw > 100) {
+        console.warn('[closeRate] exceeds 100% — sold:', sold, 'calls:', totalCalls, 'raw:', raw.toFixed(1) + '%');
+      } else {
+        closeRate = raw.toFixed(1) + '%';
+      }
+    }
 
-    renderRepLeaderboard(opps, calls);
-    renderClientLeaderboard(opps, calls);
+    $mSold.textContent     = sold;
+    $mRevenue.textContent  = fmt$(revenue);
+    $mCalls.textContent    = totalCalls;
+    $mTalktime.textContent = fmtDurLong(talkSec);
+    $mRate.textContent     = closeRate;
+
+    renderRepLeaderboard(wonOpps, calls);
+    renderClientLeaderboard(wonOpps, calls);
   }
 
-  function renderRepLeaderboard(opps, calls) {
+  // Fix 2, 3, 6: wonOpps already filtered by lastStageChangeAt; uses getOppRepId(); monetaryValue > 0 only
+  function renderRepLeaderboard(wonOpps, calls) {
     const sort = $repSort.value;
     const reps = appData.config.reps;
 
     const rows = reps.map(r => {
-      const rOpps  = opps.filter(o => o.assignedTo === r.userId);
-      const rWon   = rOpps.filter(o => (o.status || '').toLowerCase() === 'won');
+      const rWon   = wonOpps.filter(o => getOppRepId(o) === r.userId);
       const rCalls = calls.filter(c => c.userId === r.userId);
       const sold   = rWon.length;
-      const rev    = rWon.reduce((s, o) => s + (o.monetaryValue || 0), 0);
+      const rev    = rWon.reduce((s, o) => s + (o.monetaryValue > 0 ? o.monetaryValue : 0), 0);
       const nCalls = rCalls.length;
       const talk   = rCalls.reduce((s, c) => s + getCallDuration(c), 0);
-      const rate   = nCalls ? ((sold / nCalls) * 100).toFixed(1) + '%' : '—';
+      // Fix 5: sanity check close rate
+      let rate = '—';
+      if (nCalls > 0) {
+        const raw = (sold / nCalls) * 100;
+        if (raw <= 100) rate = raw.toFixed(1) + '%';
+      }
       return { rep: r, sold, rev, nCalls, talk, rate };
     });
 
@@ -515,17 +569,22 @@
     });
   }
 
-  function renderClientLeaderboard(opps, calls) {
+  // Fix 1, 3, 5: wonOpps by lastStageChangeAt; monetaryValue > 0; close rate sanity
+  function renderClientLeaderboard(wonOpps, calls) {
     const sort = $clientSort.value;
     const clients = appData.config.clients;
 
     const rows = clients.map(cl => {
-      const cOpps  = opps.filter(o => o.locationId === cl.locationId);
-      const cWon   = cOpps.filter(o => (o.status || '').toLowerCase() === 'won');
+      const cWon   = wonOpps.filter(o => o.locationId === cl.locationId);
       const cCalls = calls.filter(c => c._clientId === cl.locationId);
       const sold   = cWon.length;
-      const rev    = cWon.reduce((s, o) => s + (o.monetaryValue || 0), 0);
-      const rate   = cCalls.length ? ((sold / cCalls.length) * 100).toFixed(1) + '%' : '—';
+      const rev    = cWon.reduce((s, o) => s + (o.monetaryValue > 0 ? o.monetaryValue : 0), 0);
+      let rate = '—';
+      if (cCalls.length > 0) {
+        const raw = (sold / cCalls.length) * 100;
+        if (raw <= 100) rate = raw.toFixed(1) + '%';
+        else console.warn('[closeRate] client sanity:', cl.name, raw.toFixed(1) + '%');
+      }
       return { cl, sold, rev, rate, calls: cCalls.length };
     });
 
@@ -1025,6 +1084,7 @@
     });
   }
 
+  // Fix 7: Proper chat bubble UI — grouped by direction, sender label, auto-scroll
   async function openSmsThread(convId, locId) {
     $smsThreadPanel.classList.remove('hidden');
     $smsThreadContact.textContent = 'Loading…';
@@ -1032,23 +1092,48 @@
 
     try {
       const data = await apiFetch(`/api/conversations/${convId}/thread?locationId=${locId}`);
-      const messages = data?.messages?.messages || data?.messages || [];
+      const raw = data?.messages?.messages || data?.messages || [];
       const convo = appData.smsConvos.find(c => c.id === convId);
-      $smsThreadContact.textContent = convo?.contactName || convo?.phone || 'Conversation';
+      const contactName = convo?.contactName || convo?.phone || 'Contact';
+      $smsThreadContact.textContent = contactName;
 
-      if (!messages.length) {
+      if (!raw.length) {
         $smsThreadMessages.innerHTML = '<div class="empty-state">No messages in thread.</div>';
         return;
       }
 
-      $smsThreadMessages.innerHTML = messages.map(m => {
-        const isOut = m.direction === 'outbound' || m.direction === 'Outbound';
-        const d = parseDate(m.dateAdded || m.createdAt);
-        const timeStr = d ? d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
+      // Sort oldest → newest
+      const messages = [...raw].sort((a, b) =>
+        (parseDate(a.dateAdded || a.createdAt) || 0) - (parseDate(b.dateAdded || b.createdAt) || 0)
+      );
+
+      // Group consecutive messages by direction
+      const groups = [];
+      let cur = null;
+      messages.forEach(m => {
+        const isOut = (m.direction || '').toLowerCase() === 'outbound';
+        if (!cur || cur.isOut !== isOut) {
+          cur = { isOut, messages: [] };
+          groups.push(cur);
+        }
+        cur.messages.push(m);
+      });
+
+      $smsThreadMessages.innerHTML = groups.map(g => {
+        const firstMsg = g.messages[0];
+        const d = parseDate(firstMsg.dateAdded || firstMsg.createdAt);
+        const timeStr = d ? d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+        const sender  = g.isOut ? 'Rep' : contactName;
+
+        const bubbles = g.messages.map(m => {
+          const body = (m.body || m.text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+          return `<div class="chat-bubble chat-${g.isOut ? 'out' : 'in'}">${body || '<em style="color:var(--sub)">Media / attachment</em>'}</div>`;
+        }).join('');
+
         return `
-          <div class="sms-msg sms-msg-${isOut ? 'out' : 'in'}">
-            <div class="sms-bubble">${m.body || m.text || ''}</div>
-            <div class="sms-time">${timeStr}</div>
+          <div class="chat-group chat-group-${g.isOut ? 'out' : 'in'}">
+            <div class="chat-group-header">${sender}${timeStr ? ` · ${timeStr}` : ''}</div>
+            ${bubbles}
           </div>
         `;
       }).join('');
@@ -1112,9 +1197,10 @@
 
     const reps = appData.config.reps;
     const rows = reps.map(r => {
-      const rWon  = weekWonOpps.filter(o => o.assignedTo === r.userId);
+      // Fix 2, 3: use getOppRepId for attribution; only count monetaryValue > 0
+      const rWon  = weekWonOpps.filter(o => getOppRepId(o) === r.userId);
       const sold  = rWon.length;
-      const rev   = rWon.reduce((s, o) => s + (o.monetaryValue || 0), 0);
+      const rev   = rWon.reduce((s, o) => s + (o.monetaryValue > 0 ? o.monetaryValue : 0), 0);
       const calls = appData.calls.filter(c => {
         if (c.userId !== r.userId) return false;
         const d = parseDate(c.dateAdded);
@@ -1226,14 +1312,19 @@
     $repModalAvatar.textContent = initials(rep.name);
     $repModalName.textContent = rep.name;
 
-    // Stats across all calls/opps
-    const repOpps  = appData.opportunities.filter(o => o.assignedTo === repId);
-    const repWon   = repOpps.filter(o => (o.status || '').toLowerCase() === 'won');
+    // Fix 2, 3: Use getOppRepId for attribution; only count monetaryValue > 0
+    const repWon   = appData.opportunities.filter(o =>
+      (o.status || '').toLowerCase() === 'won' && getOppRepId(o) === repId
+    );
     const repCalls = appData.calls.filter(c => c.userId === repId);
     const talkSec  = repCalls.reduce((s, c) => s + getCallDuration(c), 0);
     const sold     = repWon.length;
-    const rev      = repWon.reduce((s, o) => s + (o.monetaryValue || 0), 0);
-    const rate     = repCalls.length ? ((sold / repCalls.length) * 100).toFixed(1) + '%' : '—';
+    const rev      = repWon.reduce((s, o) => s + (o.monetaryValue > 0 ? o.monetaryValue : 0), 0);
+    let rate = '—';
+    if (repCalls.length > 0) {
+      const raw = (sold / repCalls.length) * 100;
+      if (raw <= 100) rate = raw.toFixed(1) + '%';
+    }
     const smsCount = appData.smsConvos.filter(c => c.assignedTo === repId).length;
 
     // Avg AI score

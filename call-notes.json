@@ -1,0 +1,63 @@
+{
+  "88FQcxomnL4nUBryAOM1": {
+    "conversationId": "Lp1aMKAnA6r70polLV2Q",
+    "aiAnalysis": {
+      "score": 2,
+      "summary": "The rep failed to engage with the lead's parking objection and immediately accepted the rejection without attempting discovery, reframing value, or exploring alternatives. The call lasted under a minute with no effort to understand the lead's fitness goals, discuss the founding membership benefits, or schedule a future conversation.",
+      "keyMoments": [
+        {
+          "type": "Opening",
+          "description": "Rep greeted Carolina professionally but did not reintroduce themselves or confirm the purpose of the call."
+        },
+        {
+          "type": "Objection Raised",
+          "description": "Lead immediately stated parking is a dealbreaker and the location won't work for weekend visits."
+        },
+        {
+          "type": "Failed Objection Handling",
+          "description": "Rep accepted the objection without probing further, offering solutions (valet, alternative times, carpooling), or pivoting to membership value."
+        },
+        {
+          "type": "Missed Close Attempt",
+          "description": "No attempt to save the deal, book a future call, gather contact info for other locations, or create urgency around founding membership."
+        }
+      ],
+      "coachingTip": "Never accept the first objection—dig deeper with questions like 'What if we could solve the parking issue?' or 'Have you considered off-peak hours when parking is easier?' Always pivot to value: 'I understand parking is a concern, but our founding members lock in lifetime rates and exclusive perks that won't be available later. Can we explore if there's a way to make this work?'",
+      "labeledTranscript": [
+        {
+          "speaker": "Rep",
+          "text": "Hello? Hi, Elena."
+        },
+        {
+          "speaker": "Lead",
+          "text": "Oh, hi. How are you?"
+        },
+        {
+          "speaker": "Rep",
+          "text": "I'm doing good. How are you?"
+        },
+        {
+          "speaker": "Lead",
+          "text": "I'm good. Thanks. Good. Good. So I came with a position, and, unfortunately, looked up the location. It's not gonna work out. Their parking situation is pretty red. So I would have looked to for it to work out, but just with that alone, it's gonna be a for me, a big factor, especially me getting over there on the weekend."
+        },
+        {
+          "speaker": "Rep",
+          "text": "Mhmm. Okay."
+        },
+        {
+          "speaker": "Lead",
+          "text": "I'll be on the lookout if you guys open one closer to me, though."
+        },
+        {
+          "speaker": "Rep",
+          "text": "For sure. And if we do, I'll be definitely on a on a lookout to call you."
+        },
+        {
+          "speaker": "Lead",
+          "text": "Alright. Sounds great. Thank you. Bye."
+        }
+      ]
+    },
+    "aiAnalyzedAt": "2026-04-09T23:56:06.551Z"
+  }
+}

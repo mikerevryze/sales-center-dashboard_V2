@@ -1,0 +1,53 @@
+Now I have the exact field names. Key things I can see:
+
+lastStageChangeAt — exists and is a proper ISO date ✓
+status — is "open" on this one (not "won") — so Closed Won opps will have status: "won"
+assignedTo — is null on this one — meaning opps aren't assigned to reps, they're just in a pipeline
+monetaryValue — is 0 — meaning revenue data may not be populated
+followers — has a user ID (WNgoIMUX6p5jBzqdlQdM) — this might be how reps are tracked on opps
+pipelineStageId — this is what determines which stage the opp is in
+
+This explains everything. Since assignedTo is null, the rep leaderboard can't attribute sales to reps from opportunities alone — it needs to cross-reference with who made the call to that contact.
+Paste this into Replit Agent:
+
+
+Fix all data accuracy issues using the confirmed GHL opportunity field names from the raw API response.
+Confirmed field names:
+
+status — is "won" for Closed Won opportunities (not "open")
+lastStageChangeAt — ISO date string of when the stage last changed, use this for date filtering sales
+assignedTo — is often null on opportunities
+monetaryValue — is often 0, do not use for revenue unless > 0
+followers — array of user IDs who follow the opp — use this as fallback for rep attribution when assignedTo is null
+contactId — use this to cross-reference with calls to attribute sales to the rep who called that contact
+pipelineStageId — the stage ID, but use status === 'won' as the primary closed won check
+
+Fix 1 — Memberships sold count:
+A sale = opportunity where status === 'won'. Filter by lastStageChangeAt falling within the selected date range. Do NOT use dateAdded for filtering sales timing.
+Fix 2 — Rep attribution for sales:
+Since assignedTo is often null, attribute a sale to a rep using this priority:
+
+If assignedTo is set, use that userId
+Else if followers array has entries, use the first follower userId
+Else cross-reference the opportunity's contactId against the calls data — find calls where contactId matches and use that call's userId as the rep
+If still no match, count as unattributed
+
+Fix 3 — Revenue:
+Only sum monetaryValue where it is > 0. If all values are 0, show $0 honestly rather than fabricating numbers. Add a note in the UI "Revenue tracking requires monetary values set on opportunities in GHL" if total is 0.
+Fix 4 — Talk time:
+Talk time must sum meta.call.duration (in seconds) from actual call messages, not from conversation metadata. The current total calls count of 50 is correct (from conversations with lastMessageType=TYPE_CALL). Talk time should be calculated from the same call data — sum all duration values from the loaded calls array (already in memory as seconds). Format as "Xh Ym" or "Ym Ys".
+Fix 5 — Close rate:
+Close rate = (Closed Won opps ÷ total calls) × 100. Cap at 100% — if result exceeds 100% something is wrong with the data scope. Add a sanity check: if close rate > 100%, show "—" and log a warning.
+Fix 6 — Rep call counts on leaderboard:
+Rep call counts must use the userId field from the TYPE_CALL message object (already fetched and in the calls cache). Cross-reference calls by userId matching the rep's GHL user ID. Show actual call count per rep, not 0.
+Fix 7 — SMS conversation UI:
+Completely redesign the SMS thread view to look like a chat UI:
+
+Outbound messages (direction === 'outbound'): right-aligned, dark green bubble rgba(0,245,160,0.15) with green border, label "Rep" above first message in a sequence
+Inbound messages (direction === 'inbound'): left-aligned, dark gray bubble #1a1a1a with #333 border, label with contact name above first message in a sequence
+Show sender name + timestamp above each message bubble group
+Messages sorted oldest to newest, newest at bottom
+Scrollable container, auto-scrolls to bottom on open
+No more plain list — proper chat bubbles only
+
+Do not change working features, dark theme, or GHL API endpoints.
