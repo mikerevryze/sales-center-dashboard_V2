@@ -509,12 +509,14 @@
     const totalCalls = calls.length;
     const talkSec    = calls.reduce((s, c) => s + getCallDuration(c), 0);
 
-    // Fix 5: Close rate sanity check — cap at 100%
+    // Close rate = won ÷ unique contacts called (not total call count)
+    // A contact may be called multiple times; each unique contact = one sales opportunity
+    const uniqueContactsCalled = new Set(calls.map(c => c.contactId).filter(Boolean)).size;
     let closeRate = '—';
-    if (totalCalls > 0) {
-      const raw = (sold / totalCalls) * 100;
+    if (uniqueContactsCalled > 0) {
+      const raw = (sold / uniqueContactsCalled) * 100;
       if (raw > 100) {
-        console.warn('[closeRate] exceeds 100% — sold:', sold, 'calls:', totalCalls, 'raw:', raw.toFixed(1) + '%');
+        console.warn('[closeRate] exceeds 100% — sold:', sold, 'uniqueContacts:', uniqueContactsCalled, 'raw:', raw.toFixed(1) + '%');
       } else {
         closeRate = raw.toFixed(1) + '%';
       }

@@ -240,7 +240,29 @@ app.get('/api/locations/:locationId/opportunities', async (req, res) => {
     const apiKey = resolveLocationKey(client);
     const headers = locationHeaders(apiKey);
 
-    const allOpps = await fetchAllOpportunities(locationId, pipelineId, headers);
+    let allOpps = [];
+
+    // When no specific pipeline requested, fetch ALL client pipelines and combine
+    if (!pipelineId && client.pipelines && client.pipelines.length > 0) {
+      for (const pipeline of client.pipelines) {
+        const pOpps = await fetchAllOpportunities(locationId, pipeline.pipelineId, headers);
+        allOpps = allOpps.concat(pOpps);
+        await sleep(300);
+      }
+      // Deduplicate by opp id
+      const seen = new Set();
+      allOpps = allOpps.filter(o => {
+        if (seen.has(o.id)) return false;
+        seen.add(o.id);
+        return true;
+      });
+    } else {
+      allOpps = await fetchAllOpportunities(locationId, pipelineId || null, headers);
+    }
+
+    const wonCount = allOpps.filter(o => o.status === 'won').length;
+    console.log(`[opps] ${locationId} combined — ${allOpps.length} total, ${wonCount} won`);
+
     const responseData = { opportunities: allOpps, total: allOpps.length };
     oppsCache.set(cacheKey, { data: responseData, timestamp: Date.now() });
     res.json(responseData);
@@ -273,9 +295,33 @@ app.get('/api/locations/:locationId/calls', async (req, res) => {
       Version: '2021-07-28',
     };
 
-    const url = `${GHL_API}/conversations/search?locationId=${locationId}&lastMessageType=TYPE_CALL&limit=50&sortBy=last_message_date&sortOrder=desc`;
-    const data = await ghlGet(url, callHeaders);
-    const convs = Array.isArray(data.conversations) ? data.conversations : [];
+    // Paginate calls up to 500 using page numbers (limit=100 per page)
+    let allConvs = [];
+    let callPage = 1;
+    let keepFetchingCalls = true;
+    while (keepFetchingCalls) {
+      const pageUrl = `${GHL_API}/conversations/search?locationId=${locationId}&lastMessageType=TYPE_CALL&limit=100&page=${callPage}&sortBy=last_message_date&sortOrder=desc`;
+      let pageData;
+      let attempt = 0;
+      while (attempt < 3) {
+        attempt++;
+        const r = await fetch(pageUrl, { headers: callHeaders });
+        if (r.status === 429) { await sleep(attempt * 3000); continue; }
+        if (!r.ok) { keepFetchingCalls = false; break; }
+        pageData = await r.json();
+        break;
+      }
+      if (!pageData) break;
+      const pageConvs = Array.isArray(pageData.conversations) ? pageData.conversations : [];
+      allConvs = allConvs.concat(pageConvs);
+      if (pageConvs.length < 100 || allConvs.length >= 500) {
+        keepFetchingCalls = false;
+      } else {
+        callPage++;
+        await sleep(300);
+      }
+    }
+    const convs = allConvs.slice(0, 500);
 
     const callObjects = convs.map(conv => ({
       conversationId: conv.id,
@@ -1195,14 +1241,32 @@ app.get('/debug-opps', async (req, res) => {
 app.get('/debug-wonopps', async (req, res) => {
   try {
     const locationId = '9oW28j2SxdPAmUhO5MDI';
-    const pipelineId = 'udyl3lJvKs31tt6O01SZ';
+    // All 4 Strong Pilates pipelines
+    const pipelines = [
+      { id: 'udyl3lJvKs31tt6O01SZ', name: 'Highland Village' },
+      { id: 'DEs336XJX4T8J1orIqYm', name: 'Lakeview' },
+      { id: 'Kz0hjzNRc8312nZQMOMw', name: 'Santa Monica' },
+      { id: 'acDfCLF5rfk6FO9Wwns5', name: 'West Lake' },
+    ];
     const apiKey = process.env.GHL_KEY_STRONG_PILATES;
     if (!apiKey) return res.status(500).json({ error: 'GHL_KEY_STRONG_PILATES secret not set' });
 
     const headers = locationHeaders(apiKey);
-    const allOpps = await fetchAllOpportunities(locationId, pipelineId, headers);
-    const wonOpps = allOpps.filter(o => o.status === 'won');
+    let allOpps = [];
+    const perPipeline = {};
 
+    for (const pipeline of pipelines) {
+      const pOpps = await fetchAllOpportunities(locationId, pipeline.id, headers);
+      perPipeline[pipeline.name] = { total: pOpps.length, won: pOpps.filter(o => o.status === 'won').length };
+      allOpps = allOpps.concat(pOpps);
+      await sleep(300);
+    }
+
+    // Deduplicate by id
+    const seen = new Set();
+    allOpps = allOpps.filter(o => { if (seen.has(o.id)) return false; seen.add(o.id); return true; });
+
+    const wonOpps = allOpps.filter(o => o.status === 'won');
     const wonByAssignedTo = {};
     wonOpps.forEach(o => {
       const key = o.assignedTo || (Array.isArray(o.followers) && o.followers.length ? `follower:${o.followers[0]}` : 'unattributed');
@@ -1212,6 +1276,7 @@ app.get('/debug-wonopps', async (req, res) => {
     res.json({
       totalOpps: allOpps.length,
       totalWon: wonOpps.length,
+      perPipeline,
       wonByAssignedTo,
       first5WonOpps: wonOpps.slice(0, 5).map(o => ({
         id: o.id,
