@@ -1,0 +1,17 @@
+Fix three root cause data bugs:
+Bug 1 — Rep filter not working:
+The calls array has userId values like bpZXjQWRBR4BX16FfiVY and WNgoIMUX6p5jBzqdlQdM. The reps-config.json has these same IDs. The frontend filter must compare call.userId === rep.id exactly. Add a GET /api/debug/repids endpoint that returns the reps from reps-config.json alongside the unique userIds found in the current calls cache, so we can verify they match. Fix the frontend rep filter to use strict string equality === when comparing userId. Also handle userId: null calls by showing them under "Unassigned" or excluding them from rep-filtered views.
+Bug 2 — Opportunities pagination missing most sales:
+The opportunities endpoint only fetches the first page. GHL paginates opportunities with a meta.nextPageUrl or startAfterId cursor. Fix the /api/locations/:locationId/opportunities endpoint to paginate through ALL pages until no more results, using:
+GET https://services.leadconnectorhq.com/opportunities/search?location_id={locationId}&pipeline_id={pipelineId}&status=won&limit=100&startAfterId={lastId}
+Keep fetching until the response returns fewer than 100 results or no nextPageUrl. Filter to only status === 'won' server-side. Return all won opportunities across all pages. Add a count to the response so we can verify total.
+Bug 3 — Duration null on all calls:
+The calls list returns duration: null because messageId is null — messages aren't fetched at list load time. Fix the talk time metric to calculate from a separate approach: when the calls cache is built, for each conversation also fetch its messages to get the TYPE_CALL message duration (meta.call.duration). Do this sequentially with 300ms delays to avoid rate limits. Store duration on each call object. If this is too slow, at minimum fix it so that when a call detail is opened and messages are fetched, the duration is cached back onto the call object in memory so subsequent metric calculations can use it.
+Also add a GET /api/debug/repids endpoint that returns:
+json{
+  "repsInConfig": [{ "id": "...", "name": "..." }],
+  "userIdsInCalls": ["...", "..."],
+  "matches": [{ "repName": "...", "id": "...", "callCount": 0 }]
+}
+So we can immediately see if the IDs match.
+Do not change anything else.

@@ -40,6 +40,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // 5-minute in-memory cache for calls results per locationId
 const callsCache = new Map(); // locationId -> { data, timestamp }
+// 10-minute in-memory cache for opportunities per locationId
+const oppsCache = new Map(); // locationId -> { data, timestamp }
 
 function agencyHeaders() {
   return {
@@ -108,7 +110,12 @@ function findClient(clients, locationId) {
 app.get('/api/config', async (req, res) => {
   try {
     const [clientsData, repsData] = await Promise.all([loadClientsConfig(), loadRepsConfig()]);
-    res.json({ clients: clientsData.clients || [], reps: repsData.reps || [] });
+    // Bug 1 fix: normalize userId — reps-config uses 'id', frontend expects 'userId'
+    const reps = (repsData.reps || []).map(r => ({
+      ...r,
+      userId: r.userId || r.id,
+    }));
+    res.json({ clients: clientsData.clients || [], reps });
   } catch (err) {
     console.error('GET /api/config error:', err.message);
     res.status(err.status || 500).json({ error: err.message });
@@ -135,34 +142,89 @@ app.get('/api/setup/pipelines/:locationId', async (req, res) => {
 });
 
 // ─── GET /api/locations/:locationId/opportunities ────────────────────────────
-// Returns only Closed Won opportunities (status === 'won')
+// Bug 2 fix: cursor-based pagination using startAfterId (not page numbers).
+// Results cached 10 min to avoid repeated GHL rate limits.
 app.get('/api/locations/:locationId/opportunities', async (req, res) => {
   try {
     const { locationId } = req.params;
-    const { pipelineId, startDate, endDate } = req.query;
+    const { pipelineId } = req.query;
+
+    // Serve from cache if fresh (key includes pipelineId so different pipeline
+    // filters get their own cache entry)
+    const cacheKey = `${locationId}__${pipelineId || ''}`;
+    const cachedOpps = oppsCache.get(cacheKey);
+    if (cachedOpps && (Date.now() - cachedOpps.timestamp) < 10 * 60 * 1000) {
+      console.log(`[opps] ${locationId} serving ${cachedOpps.data.total} opps from cache`);
+      return res.json(cachedOpps.data);
+    }
+
     const clientsData = await loadClientsConfig();
     const client = findClient(clientsData.clients, locationId);
     const apiKey = resolveLocationKey(client);
+    const headers = locationHeaders(apiKey);
 
-    let url = `${GHL_API}/opportunities/search?location_id=${locationId}`;
-    if (pipelineId) url += `&pipeline_id=${encodeURIComponent(pipelineId)}`;
+    let baseUrl = `${GHL_API}/opportunities/search?location_id=${locationId}&limit=100`;
+    if (pipelineId) baseUrl += `&pipeline_id=${encodeURIComponent(pipelineId)}`;
 
     const allOpps = [];
-    let page = 1;
+    let startAfterId = null;
     let hasMore = true;
+    let safetyCount = 0;
 
-    while (hasMore) {
-      const pageUrl = url + `&page=${page}&limit=100`;
-      const data = await ghlGet(pageUrl, locationHeaders(apiKey));
+    while (hasMore && safetyCount < 100) {
+      safetyCount++;
+      let pageUrl = baseUrl;
+      if (startAfterId) pageUrl += `&startAfterId=${encodeURIComponent(startAfterId)}`;
+
+      // Fetch with 429 retry
+      let data;
+      let attempt = 0;
+      while (attempt < 3) {
+        attempt++;
+        const r = await fetch(pageUrl, { headers });
+        if (r.status === 429) {
+          const waitMs = attempt * 3000;
+          console.warn(`[opps] 429 on page ${safetyCount}, waiting ${waitMs}ms (attempt ${attempt})...`);
+          await sleep(waitMs);
+          continue;
+        }
+        if (!r.ok) {
+          const text = await r.text();
+          const err = new Error(`GHL ${r.status}: ${text}`);
+          err.status = r.status;
+          throw err;
+        }
+        data = await r.json();
+        break;
+      }
+      if (!data) break; // exhausted retries
+
       const opps = data.opportunities || [];
       allOpps.push(...opps);
-      const meta = data.meta || {};
-      hasMore = opps.length === 100 && (meta.total ? allOpps.length < meta.total : true);
-      page++;
-      if (page > 20) break;
+
+      console.log(`[opps] ${locationId} page ${safetyCount}: got ${opps.length}, total so far: ${allOpps.length}`);
+
+      if (opps.length < 100) {
+        hasMore = false;
+      } else {
+        // Extract cursor from nextPageUrl or fall back to last opp id
+        const meta = data.meta || {};
+        const nextUrl = meta.nextPageUrl || '';
+        const match = nextUrl.match(/startAfterId=([^&]+)/);
+        startAfterId = match
+          ? decodeURIComponent(match[1])
+          : (opps.length > 0 ? opps[opps.length - 1].id : null);
+        if (!startAfterId) hasMore = false;
+        else await sleep(100); // small pause between pages to respect rate limits
+      }
     }
 
-    res.json({ opportunities: allOpps, total: allOpps.length });
+    const wonCount = allOpps.filter(o => o.status === 'won').length;
+    console.log(`[opps] ${locationId} done — ${allOpps.length} total opps, ${wonCount} won`);
+
+    const responseData = { opportunities: allOpps, total: allOpps.length };
+    oppsCache.set(cacheKey, { data: responseData, timestamp: Date.now() });
+    res.json(responseData);
   } catch (err) {
     console.error('GET /api/locations/:id/opportunities error:', err.message);
     res.status(err.status || 500).json({ error: err.message });
@@ -170,8 +232,8 @@ app.get('/api/locations/:locationId/opportunities', async (req, res) => {
 });
 
 // ─── GET /api/locations/:locationId/calls ────────────────────────────────────
-// Fast: one API call to conversations/search filtered by lastMessageType=TYPE_CALL.
-// No per-conversation message fetching. Duration/messageId loaded on click.
+// Bug 3 fix: after building call list, sequentially fetches message details
+// (300ms delay) to populate duration and messageId on each call object.
 // Results cached 5 min.
 app.get('/api/locations/:locationId/calls', async (req, res) => {
   try {
@@ -209,6 +271,41 @@ app.get('/api/locations/:locationId/calls', async (req, res) => {
       userId: conv.assignedTo || null,
       locationId,
     }));
+
+    // Bug 3 fix: fetch TYPE_CALL message details (duration, messageId) sequentially
+    // with 300ms delay to avoid rate limits
+    console.log(`[calls] ${locationId}: fetching message details for ${callObjects.length} calls...`);
+    for (let i = 0; i < callObjects.length; i++) {
+      const co = callObjects[i];
+      try {
+        await sleep(300);
+        let msgRes = await fetch(`${GHL_API}/conversations/${co.conversationId}/messages`, { headers: callHeaders });
+        if (msgRes.status === 429) {
+          console.warn(`[calls] 429 rate limit on conv ${co.conversationId}, waiting 3s...`);
+          await sleep(3000);
+          msgRes = await fetch(`${GHL_API}/conversations/${co.conversationId}/messages`, { headers: callHeaders });
+        }
+        if (!msgRes.ok) {
+          console.warn(`[calls] conv ${co.conversationId} messages returned ${msgRes.status}`);
+          continue;
+        }
+        const msgData = await msgRes.json();
+        const messages = Array.isArray(msgData.messages?.messages) ? msgData.messages.messages
+          : Array.isArray(msgData.messages) ? msgData.messages : [];
+        const callMsg = messages.find(m => m.type === 1 || m.messageType === 'TYPE_CALL');
+        if (callMsg) {
+          co.messageId = callMsg.id || callMsg.messageId || null;
+          co.duration  = callMsg.meta?.call?.duration ?? callMsg.meta?.callDuration ?? null;
+          // Use message-level userId if conversation-level assignedTo was null
+          if (!co.userId && callMsg.userId) co.userId = callMsg.userId;
+        }
+      } catch (e) {
+        console.warn(`[calls] failed to fetch messages for conv ${co.conversationId}:`, e.message);
+      }
+    }
+
+    const nullDur = callObjects.filter(c => c.duration === null).length;
+    console.log(`[calls] ${locationId} done — ${callObjects.length} calls, ${nullDur} with null duration`);
 
     const responseData = { calls: callObjects, total: callObjects.length };
     callsCache.set(locationId, { data: responseData, timestamp: Date.now() });
@@ -279,6 +376,49 @@ app.get('/api/conversations/:conversationId/messages', async (req, res) => {
     res.json({ messageId, duration, status, userId: callMsg.userId || null });
   } catch (err) {
     console.error('GET /api/conversations/:id/messages error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/debug/repids ────────────────────────────────────────────────────
+// Returns reps from config alongside unique userIds found in calls cache.
+// Use to verify IDs match between reps-config.json and GHL call data.
+app.get('/api/debug/repids', async (req, res) => {
+  try {
+    const repsData = await loadRepsConfig();
+    const reps = repsData.reps || [];
+
+    // Collect all userIds from every cached calls set
+    const callsById = {};
+    callsCache.forEach((cached, locId) => {
+      (cached.data.calls || []).forEach(c => {
+        if (c.userId) {
+          if (!callsById[c.userId]) callsById[c.userId] = 0;
+          callsById[c.userId]++;
+        }
+      });
+    });
+
+    const userIdsInCalls = Object.keys(callsById);
+
+    const matches = reps.map(r => {
+      const id = r.userId || r.id;
+      return {
+        repName: r.name,
+        id,
+        callCount: callsById[id] || 0,
+        matchFound: userIdsInCalls.includes(id),
+      };
+    });
+
+    res.json({
+      repsInConfig: reps.map(r => ({ id: r.userId || r.id, name: r.name })),
+      userIdsInCalls,
+      callCountsByUserId: callsById,
+      matches,
+      note: 'Hit /api/locations/:locationId/calls first to warm the cache',
+    });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
