@@ -977,3 +977,305 @@ body {
 
 /* ─── SMS Outcome Badge ───────────────────────────────────────────────────── */
 .sms-badges { display: flex; gap: 6px; flex-shrink: 0; align-items: flex-start; }
+
+/* ─── Header Right ────────────────────────────────────────────────────────── */
+.header-right { flex-shrink: 0; display: flex; align-items: center; gap: 8px; }
+
+/* ─── Manager / My View Toggle ────────────────────────────────────────────── */
+.view-mode-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-view-mode {
+  padding: 5px 12px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--sub);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.btn-view-mode:hover { color: var(--text); border-color: var(--muted); }
+.btn-view-mode.btn-view-active {
+  background: var(--accent2);
+  border-color: rgba(0,245,160,0.4);
+  color: var(--accent);
+}
+
+/* ─── Rep Profile Panel (slide-in from right) ─────────────────────────────── */
+.rep-panel {
+  position: fixed;
+  top: 56px;
+  right: 0;
+  width: 62%;
+  max-width: 860px;
+  height: calc(100vh - 56px);
+  background: #0d0d0d;
+  border-left: 1px solid var(--border);
+  z-index: 600;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+.rep-panel.open { transform: translateX(0); }
+
+.rep-panel-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.rp-hero { display: flex; align-items: center; gap: 14px; }
+.rp-avatar-wrap { position: relative; flex-shrink: 0; }
+.rp-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--accent2);
+  border: 2px solid var(--accent);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 800;
+}
+.rp-online-dot {
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #0d0d0d;
+}
+.rp-name { font-size: 20px; font-weight: 800; color: var(--text); }
+.rp-sub  { font-size: 11px; color: var(--sub); margin-top: 2px; }
+
+/* Stats row */
+.rp-stats-row {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.rp-stat {
+  flex: 1;
+  text-align: center;
+  padding: 10px 6px;
+  border-right: 1px solid var(--border);
+}
+.rp-stat:last-child { border-right: none; }
+.rp-stat-val { font-size: 16px; font-weight: 700; color: var(--accent); line-height: 1.2; }
+.rp-stat-lbl { font-size: 9px; color: var(--sub); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+
+/* Tab bar */
+.rp-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.rp-tabs::-webkit-scrollbar { display: none; }
+.rp-tab {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  color: var(--sub);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.rp-tab:hover { color: var(--text); }
+.rp-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+/* Content area */
+.rp-content {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+.rp-pane {
+  height: 100%;
+  overflow-y: auto;
+}
+.rp-pane-hidden { display: none !important; }
+
+/* Search wrap in calls pane */
+.rp-search-wrap {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.rp-call-list { max-height: none; overflow-y: auto; }
+
+/* Section label within pane */
+.rp-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--sub);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 12px 16px 4px;
+}
+
+/* Pipeline Funnel */
+.rp-funnel-header {
+  padding: 12px 16px 4px;
+  font-size: 11px;
+  color: var(--sub);
+  font-weight: 500;
+}
+.rp-funnel {
+  padding: 4px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rp-funnel-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rp-funnel-label {
+  width: 160px;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rp-funnel-bar-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rp-funnel-bar {
+  height: 22px;
+  border-radius: 4px;
+  background: rgba(0,245,160,0.25);
+  border: 1px solid rgba(0,245,160,0.4);
+  transition: width 0.4s ease;
+  min-width: 4px;
+}
+.rp-funnel-bar.won { background: rgba(0,245,160,0.35); border-color: rgba(0,245,160,0.7); }
+.rp-funnel-bar.lost { background: rgba(239,68,68,0.2); border-color: rgba(239,68,68,0.4); }
+.rp-funnel-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  flex-shrink: 0;
+  min-width: 24px;
+}
+
+/* Appointments */
+.rp-appt-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.rp-appt-row:last-child { border-bottom: none; }
+.rp-appt-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+.rp-appt-contact { font-size: 13px; font-weight: 500; color: var(--text); }
+.rp-appt-sub { font-size: 11px; color: var(--sub); margin-top: 2px; }
+
+/* Scores */
+.rp-avg-score-wrap {
+  padding: 12px 16px 0;
+  flex-shrink: 0;
+}
+.rp-avg-score-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--accent2);
+  border: 1px solid rgba(0,245,160,0.25);
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+.rp-avg-val { font-size: 26px; font-weight: 800; line-height: 1; }
+.rp-avg-lbl { font-size: 11px; color: var(--sub); }
+.rp-score-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.rp-coaching-tip {
+  font-style: italic;
+  color: var(--sub);
+  font-size: 11px;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Notes */
+.rp-note-item {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+.rp-note-item:hover { background: rgba(255,255,255,0.03); }
+.rp-note-meta { font-size: 10px; color: var(--sub); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.4px; }
+.rp-note-text { font-size: 12px; color: #ccc; line-height: 1.6; }
+.rp-add-note { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+
+/* Loading row in pane */
+.loading-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 40px 20px;
+  color: var(--sub);
+  font-size: 13px;
+  justify-content: center;
+}
+
+/* Leaderboard right column (used in lb-row) */
+.lb-right { text-align: right; flex-shrink: 0; min-width: 54px; }
+.lb-val   { font-size: 18px; font-weight: 700; color: var(--accent); }
+
+/* ─── Responsive adjustments ─────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .rep-panel { width: 80%; }
+}
+@media (max-width: 860px) {
+  .rep-panel { width: 100%; }
+  .rp-funnel-label { width: 100px; }
+}
+@media (max-width: 640px) {
+  .view-mode-wrap { display: none; }
+}

@@ -1,0 +1,69 @@
+Build out the rep profile system and fix call count metrics. Here's everything needed:
+Fix 1 — Total calls metric on Command Center:
+Total calls must show the sum of all calls across all configured reps from the calls cache. Count calls where userId matches any rep in reps-config.json PLUS unassigned calls. This is a simple appData.calls.length count — not filtered by rep. Fix the metric card to show this correctly.
+Fix 2 — Rep profile modal (click any rep anywhere):
+When a rep avatar, name, or row is clicked anywhere on the dashboard, open a full-screen slide-in panel from the right showing their complete profile. The panel has these sections:
+Header:
+
+Large avatar with initials, rep name, green online indicator
+Stats row: Total Calls | Memberships Sold | Revenue | Avg AI Score | Close Rate | Talk Time
+
+Pipeline Funnel tab:
+
+Show count of opportunities at each stage for this rep across all pipelines
+Stages in order: New Lead, Contacted, Talked/Brushed Off, Connected, Call Scheduled, No Show, Pitched, Closed Won, Closed Lost
+Visual funnel bar showing relative counts — wider = more leads at that stage
+Attribution: count opps where assignedTo === rep.id OR followers array contains rep.id
+
+Upcoming Appointments tab:
+
+Fetch from GHL calendar: GET https://services.leadconnectorhq.com/calendars/events?locationId={locationId}&userId={repId}&startTime={now}&endTime={30daysFromNow}
+Show each appointment: contact name, date/time, appointment type, status
+Also show opps in "Call Scheduled" stage attributed to this rep as a secondary list
+Add backend endpoint GET /api/reps/:repId/appointments?locationId=
+
+Calls tab:
+
+Full scrollable list of all this rep's calls (filter appData.calls by userId)
+Same call row format as main Calls tab — direction, contact, date, duration, outcome badge
+Clicking a call opens the full call detail panel with recording, transcript, AI analysis, manager notes
+Search box to search by contact name
+
+SMS tab:
+
+All SMS conversations where assignedTo === rep.id from the conversations cache
+Same chat bubble UI as main Conversations tab
+
+Scores tab:
+
+All calls that have been AI analyzed for this rep, sorted by score descending
+Each row: contact name, date, score badge (color coded: 9-10 green, 7-8 yellow, below 7 red), coaching tip preview
+Average score prominently displayed at top
+Manager notes count shown per call
+
+Manager Notes tab:
+
+All manager notes saved for this rep's calls in one place
+Each note shows: contact name, call date, note text, date saved
+Ability to add a general rep note (not tied to a specific call) saved to rep-notes.json keyed by repId
+
+Backend additions:
+
+GET /api/reps/:repId/appointments?locationId= — fetches GHL calendar events for that rep
+GET /api/reps/:repId/pipeline-stats?locationId= — fetches all opportunities attributed to this rep across all configured pipelines, groups by stage name, returns count per stage
+GET /api/rep-notes/:repId — reads general rep notes from rep-notes.json
+POST /api/rep-notes/:repId — saves general rep note
+
+Pipeline stats logic:
+For each pipeline in clients-config.json for the given location, fetch opportunities and filter to those where assignedTo === repId OR repId is in followers array. Group by pipelineStageId and map to stage name using the stages array from clients-config.json pipelines. Return counts per stage name.
+Access control:
+Add a simple toggle in the top right: "Manager View / My View". In "My View" mode, a rep name selector appears — select your name and the entire dashboard filters to just your data. The rep profile panel in My View only shows that rep's own data. No login required — just honor-system name selection stored in localStorage.
+Design:
+
+Panel slides in from right, takes up 60% of screen width on desktop, full screen on mobile
+Dark theme matching rest of app — #0a0a0a background, #111 panels
+Tabs at top of panel for each section
+Close button top right (X)
+Smooth slide-in animation transform: translateX transition 0.3s ease
+
+Do not change existing working features, GHL API endpoints, or data fetching logic.

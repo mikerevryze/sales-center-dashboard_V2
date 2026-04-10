@@ -86,17 +86,12 @@
   const $saveRubricBtn       = document.getElementById('save-rubric-btn');
   const $saveRepOverrideBtn  = document.getElementById('save-rep-override-btn');
 
-  // Rep profile modal
-  const $repModalOverlay     = document.getElementById('rep-modal-overlay');
-  const $repProfileModal     = document.getElementById('rep-profile-modal');
-  const $repModalClose       = document.getElementById('rep-modal-close');
-  const $repModalAvatar      = document.getElementById('rep-modal-avatar');
-  const $repModalName        = document.getElementById('rep-modal-name');
-  const $repModalSub         = document.getElementById('rep-modal-sub');
-  const $repModalStats       = document.getElementById('rep-modal-stats');
-  const $repModalTopCalls    = document.getElementById('rep-modal-top-calls');
-  const $repModalAllCalls    = document.getElementById('rep-modal-all-calls');
-  const $repModalViewBtn     = document.getElementById('rep-modal-view-btn');
+  // Rep profile panel (slide-in from right)
+  const $repPanelOverlay = document.getElementById('rep-panel-overlay');
+  const $repPanel        = document.getElementById('rep-panel');
+  // Manager / My View toggle
+  const $viewModeBtn   = document.getElementById('view-mode-btn');
+  const $myViewRepSel  = document.getElementById('my-view-rep-select');
 
   // ─── App State ──────────────────────────────────────────────────────────────
   const appData = {
@@ -134,7 +129,10 @@
   let currentCallRepId     = null;
   let currentCallContactId = null;
   let currentProfileRepId  = null;
+  let currentPanelLocId    = null;
   let activeTab            = 'command';
+  let myViewRepId          = null;
+  let viewToggleReady      = false;
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
   function showError(msg) {
@@ -345,6 +343,7 @@
       buildNotesByConvId();
 
       populateSelects();
+      if (!viewToggleReady) { initViewToggle(); viewToggleReady = true; }
 
       const clientCount = config.clients.length;
       $loadingMsg.textContent = `Fetching data for ${clientCount} client${clientCount > 1 ? 's' : ''}…`;
@@ -453,6 +452,12 @@
 
     while ($rubricRepSelect.options.length > 1) $rubricRepSelect.remove(1);
     reps.forEach(r => $rubricRepSelect.add(new Option(r.name, r.userId)));
+
+    // My View rep selector
+    while ($myViewRepSel.options.length) $myViewRepSel.remove(0);
+    reps.forEach(r => $myViewRepSel.add(new Option(r.name, r.userId)));
+    const storedRep = localStorage.getItem('myViewRepId');
+    if (storedRep) $myViewRepSel.value = storedRep;
   }
 
   // ─── Command Center ──────────────────────────────────────────────────────────
@@ -476,6 +481,7 @@
       if (ccFilters.pipelineId !== 'all' && o.pipelineId !== ccFilters.pipelineId) return false;
       const d = parseDate(o.lastStageChangeAt);
       if (!d || d < cutoff) return false;
+      if (myViewRepId && getOppRepId(o) !== myViewRepId) return false;
       return true;
     });
   }
@@ -486,6 +492,7 @@
       if (ccFilters.clientId !== 'all' && c._clientId !== ccFilters.clientId) return false;
       const d = parseDate(c.dateAdded);
       if (d && d < cutoff) return false;
+      if (myViewRepId && c.userId !== myViewRepId) return false;
       return true;
     });
   }
@@ -523,7 +530,9 @@
   // Fix 2, 3, 6: wonOpps already filtered by lastStageChangeAt; uses getOppRepId(); monetaryValue > 0 only
   function renderRepLeaderboard(wonOpps, calls) {
     const sort = $repSort.value;
-    const reps = appData.config.reps;
+    const reps = myViewRepId
+      ? appData.config.reps.filter(r => r.userId === myViewRepId)
+      : appData.config.reps;
 
     const rows = reps.map(r => {
       const rWon   = wonOpps.filter(o => getOppRepId(o) === r.userId);
@@ -621,8 +630,9 @@
     return appData.calls.filter(c => {
       // Client
       if (callFilters.clientId !== 'all' && c._clientId !== callFilters.clientId) return false;
-      // Rep
+      // Rep (explicit filter takes precedence; My View adds implicit filter)
       if (callFilters.repId && c.userId !== callFilters.repId) return false;
+      if (!callFilters.repId && myViewRepId && c.userId !== myViewRepId) return false;
       // Date
       const d = parseDate(c.dateAdded);
       if (callFilters.fromDate && d && d < callFilters.fromDate) return false;
@@ -1023,6 +1033,7 @@
     const search = smsFilters.search.toLowerCase().trim();
     return appData.smsConvos.filter(c => {
       if (smsFilters.clientId !== 'all' && c.locationId !== smsFilters.clientId) return false;
+      if (myViewRepId && c.assignedTo !== myViewRepId) return false;
       if (search && !(c.contactName || c.phone || '').toLowerCase().includes(search)) return false;
       if (smsFilters.outcome !== 'all') {
         if (smsFilters.outcome === 'sold') {
@@ -1195,7 +1206,9 @@
       return d && d >= start && d <= end;
     });
 
-    const reps = appData.config.reps;
+    const reps = myViewRepId
+      ? appData.config.reps.filter(r => r.userId === myViewRepId)
+      : appData.config.reps;
     const rows = reps.map(r => {
       // Fix 2, 3: use getOppRepId for attribution; only count monetaryValue > 0
       const rWon  = weekWonOpps.filter(o => getOppRepId(o) === r.userId);
@@ -1303,20 +1316,26 @@
     }
   });
 
-  // ─── Rep Profile Modal (Fix 4) ────────────────────────────────────────────────
+  // ─── Rep Profile Panel (slide-in) ────────────────────────────────────────────
   function openRepProfile(repId) {
     const rep = getRepById(repId);
     if (!rep) return;
     currentProfileRepId = repId;
 
-    $repModalAvatar.textContent = initials(rep.name);
-    $repModalName.textContent = rep.name;
+    // Determine primary location for this rep
+    const repCall = appData.calls.find(c => c.userId === repId);
+    currentPanelLocId = repCall ? repCall._clientId : (appData.config.clients[0]?.locationId || null);
 
-    // Fix 2, 3: Use getOppRepId for attribution; only count monetaryValue > 0
+    // Header
+    document.getElementById('rp-avatar').textContent = initials(rep.name);
+    document.getElementById('rp-name').textContent = rep.name;
+    document.getElementById('rp-sub').textContent = getClientName(currentPanelLocId) || '';
+
+    // Stats row
+    const repCalls = appData.calls.filter(c => c.userId === repId);
     const repWon   = appData.opportunities.filter(o =>
       (o.status || '').toLowerCase() === 'won' && getOppRepId(o) === repId
     );
-    const repCalls = appData.calls.filter(c => c.userId === repId);
     const talkSec  = repCalls.reduce((s, c) => s + getCallDuration(c), 0);
     const sold     = repWon.length;
     const rev      = repWon.reduce((s, o) => s + (o.monetaryValue > 0 ? o.monetaryValue : 0), 0);
@@ -1325,105 +1344,411 @@
       const raw = (sold / repCalls.length) * 100;
       if (raw <= 100) rate = raw.toFixed(1) + '%';
     }
-    const smsCount = appData.smsConvos.filter(c => c.assignedTo === repId).length;
-
-    // Avg AI score
     const aiScores = repCalls
       .map(c => appData.notesByConvId[c.conversationId || c.id]?.aiAnalysis?.score)
       .filter(s => s != null);
-    const avgAi = aiScores.length ? (aiScores.reduce((a, b) => a + b, 0) / aiScores.length).toFixed(1) : '—';
+    const avgAi = aiScores.length
+      ? (aiScores.reduce((a, b) => a + b, 0) / aiScores.length).toFixed(1)
+      : '—';
 
-    $repModalSub.textContent = `${smsCount} SMS conversations`;
-
-    $repModalStats.innerHTML = `
-      <div class="rep-modal-stat"><div class="rep-modal-stat-val">${sold}</div><div class="rep-modal-stat-lbl">Sold</div></div>
-      <div class="rep-modal-stat"><div class="rep-modal-stat-val">${fmt$(rev)}</div><div class="rep-modal-stat-lbl">Revenue</div></div>
-      <div class="rep-modal-stat"><div class="rep-modal-stat-val">${repCalls.length}</div><div class="rep-modal-stat-lbl">Calls</div></div>
-      <div class="rep-modal-stat"><div class="rep-modal-stat-val">${fmtDurLong(talkSec)}</div><div class="rep-modal-stat-lbl">Talk Time</div></div>
-      <div class="rep-modal-stat"><div class="rep-modal-stat-val">${rate}</div><div class="rep-modal-stat-lbl">Close Rate</div></div>
-      <div class="rep-modal-stat"><div class="rep-modal-stat-val" style="color:${avgAi !== '—' ? '#00f5a0' : 'inherit'}">${avgAi}</div><div class="rep-modal-stat-lbl">Avg AI</div></div>
+    document.getElementById('rp-stats').innerHTML = `
+      <div class="rp-stat"><div class="rp-stat-val">${repCalls.length}</div><div class="rp-stat-lbl">Calls</div></div>
+      <div class="rp-stat"><div class="rp-stat-val">${sold}</div><div class="rp-stat-lbl">Sold</div></div>
+      <div class="rp-stat"><div class="rp-stat-val">${fmt$(rev)}</div><div class="rp-stat-lbl">Revenue</div></div>
+      <div class="rp-stat"><div class="rp-stat-val" style="color:${avgAi !== '—' ? '#00f5a0' : 'inherit'}">${avgAi}</div><div class="rp-stat-lbl">Avg AI</div></div>
+      <div class="rp-stat"><div class="rp-stat-val">${rate}</div><div class="rp-stat-lbl">Close Rate</div></div>
+      <div class="rp-stat"><div class="rp-stat-val">${fmtDurLong(talkSec)}</div><div class="rp-stat-lbl">Talk Time</div></div>
     `;
 
-    // Top 3 AI-scored calls
-    const scoredCalls = repCalls
-      .map(c => {
-        const note = appData.notesByConvId[c.conversationId || c.id];
-        return { call: c, score: note?.aiAnalysis?.score };
-      })
-      .filter(x => x.score != null)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 3);
-
-    $repModalTopCalls.innerHTML = scoredCalls.length
-      ? scoredCalls.map(x => miniCallRow(x.call, x.score)).join('')
-      : '<div class="empty-state" style="padding:12px 16px;font-size:12px">No analyzed calls yet.</div>';
-
-    // Recent 10 calls
-    const recent = [...repCalls].sort((a, b) => {
-      const da = parseDate(a.dateAdded), db = parseDate(b.dateAdded);
-      return (db || 0) - (da || 0);
-    }).slice(0, 10);
-    $repModalAllCalls.innerHTML = recent.length
-      ? recent.map(c => miniCallRow(c)).join('')
-      : '<div class="empty-state" style="padding:12px 16px;font-size:12px">No calls found.</div>';
-
-    $repProfileModal.classList.remove('hidden');
-    $repModalOverlay.classList.remove('hidden');
-    bindMiniCallRows($repModalTopCalls);
-    bindMiniCallRows($repModalAllCalls);
-  }
-
-  function miniCallRow(c, aiScore) {
-    const dir    = getCallDir(c);
-    const dur    = getCallDuration(c);
-    const d      = parseDate(c.dateAdded);
-    const dateStr = d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
-    const convId = c.conversationId || c.id;
-    return `
-      <div class="call-row" style="padding:8px 16px" data-conv-id="${convId}" data-client-id="${c._clientId}">
-        <div class="call-dir-icon ${dir === 'inbound' ? 'dir-in' : dir === 'missed' ? 'dir-missed' : 'dir-out'}" style="width:20px;height:20px;font-size:10px">
-          ${dir === 'inbound' ? '↙' : '↗'}
-        </div>
-        <div class="call-row-main">
-          <div class="call-row-top" style="font-size:12px">${c.contactName || c.phone || 'Unknown'}</div>
-          <div class="call-row-sub">
-            <span>${getClientName(c._clientId)}</span>
-            ${dur ? `<span>${fmtDur(dur)}</span>` : ''}
-            ${dateStr ? `<span>${dateStr}</span>` : ''}
-            ${aiScore != null ? `<span class="badge badge-ai">AI ${aiScore}/10</span>` : ''}
-          </div>
-        </div>
-      </div>
-    `;
+    // Open panel & switch to pipeline tab
+    $repPanel.classList.add('open');
+    $repPanelOverlay.classList.remove('hidden');
+    switchRepTab('pipeline');
   }
 
   function closeRepProfile() {
-    $repProfileModal.classList.add('hidden');
-    $repModalOverlay.classList.add('hidden');
+    $repPanel.classList.remove('open');
+    $repPanelOverlay.classList.add('hidden');
     currentProfileRepId = null;
+    currentPanelLocId = null;
   }
 
-  $repModalClose.addEventListener('click', closeRepProfile);
-  $repModalOverlay.addEventListener('click', closeRepProfile);
-
-  $repModalViewBtn.addEventListener('click', () => {
+  function switchRepTab(name) {
+    document.querySelectorAll('.rp-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.rpTab === name);
+    });
+    document.querySelectorAll('.rp-pane').forEach(p => {
+      p.classList.toggle('rp-pane-hidden', p.id !== `rp-pane-${name}`);
+    });
     if (!currentProfileRepId) return;
-    closeRepProfile();
-    // Switch to Calls tab and filter by rep
-    callFilters.repId = currentProfileRepId;
-    $callsRepSelect.value = currentProfileRepId;
-    switchTab('calls');
-    renderCallLog();
+    if      (name === 'pipeline')     renderProfilePipeline(currentProfileRepId, currentPanelLocId);
+    else if (name === 'appointments') renderProfileAppointments(currentProfileRepId, currentPanelLocId);
+    else if (name === 'calls')        renderProfileCalls(currentProfileRepId);
+    else if (name === 'sms')          renderProfileSms(currentProfileRepId);
+    else if (name === 'scores')       renderProfileScores(currentProfileRepId);
+    else if (name === 'notes')        renderProfileNotes(currentProfileRepId);
+  }
+
+  document.getElementById('rep-panel-close').addEventListener('click', closeRepProfile);
+  $repPanelOverlay.addEventListener('click', closeRepProfile);
+  document.querySelector('.rp-tabs').addEventListener('click', e => {
+    const btn = e.target.closest('.rp-tab');
+    if (btn) switchRepTab(btn.dataset.rpTab);
   });
 
-  // Click on mini call row in rep modal → open call detail
-  function bindMiniCallRows(container) {
-    container.querySelectorAll('.call-row[data-conv-id]').forEach(row => {
+  // ─── Pipeline Funnel ──────────────────────────────────────────────────────────
+  async function renderProfilePipeline(repId, locId) {
+    const pane = document.getElementById('rp-pane-pipeline');
+    pane.innerHTML = '<div class="loading-row"><span class="spinner"></span> Loading pipeline…</div>';
+    try {
+      if (!locId) throw new Error('No location found for this rep');
+      const data = await apiFetch(`/api/reps/${repId}/pipeline-stats?locationId=${locId}`);
+      const { stageCounts = {}, total = 0 } = data;
+      if (!total) {
+        pane.innerHTML = '<div class="empty-state">No pipeline opportunities found for this rep.</div>';
+        return;
+      }
+      const STAGE_ORDER = [
+        'New Lead','Contacted','Talked/Brushed Off','Connected',
+        'Call Scheduled','No Show','Pitched','Closed Won','Closed Lost',
+      ];
+      const stages = Object.entries(stageCounts).sort(([a], [b]) => {
+        const ai = STAGE_ORDER.indexOf(a), bi = STAGE_ORDER.indexOf(b);
+        if (ai !== -1 && bi !== -1) return ai - bi;
+        if (ai !== -1) return -1;
+        if (bi !== -1) return 1;
+        return (stageCounts[b] || 0) - (stageCounts[a] || 0);
+      });
+      const maxCount = Math.max(...stages.map(([, c]) => c), 1);
+      pane.innerHTML = `
+        <div class="rp-funnel-header">${total} total opportunities</div>
+        <div class="rp-funnel">
+          ${stages.map(([name, count]) => {
+            const pct = Math.round((count / maxCount) * 100);
+            const cls = name.toLowerCase().includes('won') ? 'won'
+              : name.toLowerCase().includes('lost') ? 'lost' : '';
+            return `
+              <div class="rp-funnel-row">
+                <div class="rp-funnel-label">${name}</div>
+                <div class="rp-funnel-bar-wrap">
+                  <div class="rp-funnel-bar ${cls}" style="width:${Math.max(pct, 4)}%"></div>
+                  <span class="rp-funnel-count">${count}</span>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    } catch (err) {
+      pane.innerHTML = `<div class="empty-state">Could not load pipeline data.<br><small>${err.message}</small></div>`;
+    }
+  }
+
+  // ─── Appointments ─────────────────────────────────────────────────────────────
+  async function renderProfileAppointments(repId, locId) {
+    const pane = document.getElementById('rp-pane-appointments');
+    pane.innerHTML = '<div class="loading-row"><span class="spinner"></span> Loading appointments…</div>';
+    try {
+      if (!locId) { pane.innerHTML = '<div class="empty-state">No location found.</div>'; return; }
+      const data = await apiFetch(`/api/reps/${repId}/appointments?locationId=${locId}`).catch(() => ({ events: [] }));
+      const events = data.events || [];
+      const scheduledOpps = appData.opportunities.filter(o => {
+        const sn = (o.pipelineStageName || '').toLowerCase();
+        return (sn.includes('call scheduled') || sn.includes('appointment')) && (
+          o.assignedTo === repId ||
+          (Array.isArray(o.followers) && o.followers.includes(repId))
+        );
+      });
+      let html = '';
+      if (events.length) {
+        html += `<div class="rp-section-label">Upcoming Appointments (${events.length})</div>`;
+        html += events.map(e => {
+          const d = parseDate(e.startTime);
+          const ds = d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+          return `<div class="rp-appt-row">
+            <div class="rp-appt-dot"></div>
+            <div class="rp-appt-info">
+              <div class="rp-appt-contact">${e.title || e.contactName || 'Appointment'}</div>
+              <div class="rp-appt-sub">${ds}${e.appoinmentStatus ? ' · ' + e.appoinmentStatus : ''}</div>
+            </div>
+          </div>`;
+        }).join('');
+      } else {
+        html += '<div class="empty-state">No upcoming calendar appointments.</div>';
+      }
+      if (scheduledOpps.length) {
+        html += `<div class="rp-section-label" style="margin-top:4px">Call Scheduled in Pipeline (${scheduledOpps.length})</div>`;
+        html += scheduledOpps.map(o => {
+          const name = o.contact?.name || o.contactName || o.name || 'Lead';
+          return `<div class="rp-appt-row">
+            <div class="rp-appt-dot" style="background:#3b82f6"></div>
+            <div class="rp-appt-info">
+              <div class="rp-appt-contact">${name}</div>
+              <div class="rp-appt-sub">${o.pipelineStageName || 'Call Scheduled'} · ${o.status || ''}</div>
+            </div>
+          </div>`;
+        }).join('');
+      }
+      pane.innerHTML = html;
+    } catch (err) {
+      pane.innerHTML = '<div class="empty-state">Failed to load appointments.</div>';
+    }
+  }
+
+  // ─── Profile Calls ────────────────────────────────────────────────────────────
+  function renderProfileCalls(repId) {
+    const list   = document.getElementById('rp-calls-list');
+    const search = document.getElementById('rp-calls-search');
+    const repCalls = [...appData.calls]
+      .filter(c => c.userId === repId)
+      .sort((a, b) => (parseDate(b.dateAdded) || 0) - (parseDate(a.dateAdded) || 0));
+
+    function doRender(q) {
+      const filtered = q
+        ? repCalls.filter(c => (c.contactName || c.phone || '').toLowerCase().includes(q))
+        : repCalls;
+      list.innerHTML = filtered.length
+        ? filtered.map(c => buildCallRow(c)).join('')
+        : '<div class="empty-state">No calls match.</div>';
+      list.querySelectorAll('.call-row').forEach(row => {
+        row.addEventListener('click', e => {
+          if (e.target.closest('.call-rep')) return;
+          closeRepProfile();
+          switchTab('calls');
+          openCallDetail(row.dataset.convId, row.dataset.clientId, row);
+        });
+      });
+    }
+
+    search.value = '';
+    search.oninput = () => doRender(search.value.trim().toLowerCase());
+    if (!repCalls.length) {
+      list.innerHTML = '<div class="empty-state">No calls found for this rep.</div>';
+    } else {
+      doRender('');
+    }
+  }
+
+  // ─── Profile SMS ──────────────────────────────────────────────────────────────
+  function renderProfileSms(repId) {
+    const list = document.getElementById('rp-sms-list');
+    const repSms = appData.smsConvos.filter(c => c.assignedTo === repId);
+    if (!repSms.length) {
+      list.innerHTML = '<div class="empty-state">No SMS conversations for this rep.</div>';
+      return;
+    }
+    list.innerHTML = repSms.map(c => {
+      const d  = parseDate(c.dateUpdated || c.lastMessageDate);
+      const ds = d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+      const isSold = appData.contactWonSet.has(c.contactId);
+      const hasOpp = !!appData.allContactOppMap[c.contactId]?.length;
+      return `
+        <div class="call-row" data-conv-id="${c.id}" data-location-id="${c.locationId}">
+          <div class="call-dir-icon dir-sms">💬</div>
+          <div class="call-row-main">
+            <div class="call-row-top">
+              <span class="call-contact">${c.contactName || c.phone || 'Unknown'}</span>
+              <div class="sms-badges">
+                ${isSold ? '<span class="badge badge-sold">Sold</span>' : ''}
+                ${!isSold && hasOpp ? '<span class="badge badge-pipeline">Pipeline</span>' : ''}
+              </div>
+            </div>
+            <div class="call-row-sub">
+              ${c.lastMessageBody ? `<span class="sms-preview">${c.lastMessageBody.slice(0,60)}…</span>` : ''}
+              ${ds ? `<span>${ds}</span>` : ''}
+            </div>
+          </div>
+          <svg class="call-chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+        </div>
+      `;
+    }).join('');
+    list.querySelectorAll('.call-row').forEach(row => {
+      row.addEventListener('click', () => {
+        closeRepProfile();
+        switchTab('sms');
+        openSmsThread(row.dataset.convId, row.dataset.locationId);
+      });
+    });
+  }
+
+  // ─── Profile Scores ───────────────────────────────────────────────────────────
+  function renderProfileScores(repId) {
+    const avgWrap = document.getElementById('rp-avg-score');
+    const list    = document.getElementById('rp-scores-list');
+    const repCalls = appData.calls.filter(c => c.userId === repId);
+    const scored = repCalls
+      .map(c => {
+        const note = appData.notesByConvId[c.conversationId || c.id];
+        return note?.aiAnalysis?.score != null
+          ? { call: c, score: note.aiAnalysis.score, tip: note.aiAnalysis.coachingTip || '' }
+          : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.score - a.score);
+
+    if (!scored.length) {
+      avgWrap.innerHTML = '';
+      list.innerHTML = '<div class="empty-state">No AI-analyzed calls for this rep yet.</div>';
+      return;
+    }
+    const avg = (scored.reduce((s, x) => s + x.score, 0) / scored.length).toFixed(1);
+    const avgColor = avg >= 8 ? '#00f5a0' : avg >= 6 ? '#f5a623' : '#ef4444';
+    avgWrap.innerHTML = `
+      <div class="rp-avg-score-box">
+        <span class="rp-avg-val" style="color:${avgColor}">${avg}/10</span>
+        <span class="rp-avg-lbl">Avg AI Score · ${scored.length} analyzed</span>
+      </div>
+    `;
+    list.innerHTML = scored.map(x => {
+      const d  = parseDate(x.call.dateAdded);
+      const ds = d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+      const sc = x.score >= 9 ? '#00f5a0' : x.score >= 7 ? '#f5a623' : '#ef4444';
+      const convId = x.call.conversationId || x.call.id;
+      return `
+        <div class="call-row" data-conv-id="${convId}" data-client-id="${x.call._clientId}">
+          <div class="rp-score-badge" style="background:${sc}18;border:1px solid ${sc}50;color:${sc}">${x.score}</div>
+          <div class="call-row-main">
+            <div class="call-row-top" style="font-size:12px">${x.call.contactName || x.call.phone || 'Unknown'}</div>
+            <div class="call-row-sub">
+              ${ds ? `<span>${ds}</span>` : ''}
+              ${x.tip ? `<span class="rp-coaching-tip">${x.tip.slice(0, 80)}…</span>` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+    list.querySelectorAll('.call-row').forEach(row => {
       row.addEventListener('click', () => {
         closeRepProfile();
         switchTab('calls');
         openCallDetail(row.dataset.convId, row.dataset.clientId, row);
       });
+    });
+  }
+
+  // ─── Profile Notes ────────────────────────────────────────────────────────────
+  async function renderProfileNotes(repId) {
+    const callNotesList    = document.getElementById('rp-call-notes-list');
+    const generalNotesList = document.getElementById('rp-general-notes-list');
+    const noteText         = document.getElementById('rp-general-note-text');
+    const saveBtn          = document.getElementById('rp-save-general-note');
+
+    // Call-level notes
+    const repCalls = appData.calls.filter(c => c.userId === repId);
+    const callNotes = repCalls
+      .map(c => {
+        const convId = c.conversationId || c.id;
+        const note   = appData.notesByConvId[convId];
+        return note?.note ? { call: c, note: note.note, convId } : null;
+      })
+      .filter(Boolean);
+
+    if (callNotes.length) {
+      callNotesList.innerHTML = `
+        <div class="rp-section-label">Call Notes (${callNotes.length})</div>
+        ${callNotes.map(n => {
+          const d  = parseDate(n.call.dateAdded);
+          const ds = d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+          return `<div class="rp-note-item" style="cursor:pointer" data-conv-id="${n.convId}" data-client-id="${n.call._clientId}">
+            <div class="rp-note-meta">${n.call.contactName || 'Unknown'} · ${ds}</div>
+            <div class="rp-note-text">${n.note}</div>
+          </div>`;
+        }).join('')}
+      `;
+      callNotesList.querySelectorAll('.rp-note-item').forEach(item => {
+        item.addEventListener('click', () => {
+          closeRepProfile();
+          switchTab('calls');
+          openCallDetail(item.dataset.convId, item.dataset.clientId, item);
+        });
+      });
+    } else {
+      callNotesList.innerHTML = '<div class="empty-state" style="font-size:12px;padding:16px 16px 0">No call notes yet.</div>';
+    }
+
+    // General rep notes
+    try {
+      const data  = await apiFetch(`/api/rep-notes/${repId}`);
+      const notes = data.notes || [];
+      generalNotesList.innerHTML = notes.length
+        ? `<div class="rp-section-label" style="margin-top:4px">General Notes</div>` +
+          notes.map(n => {
+            const d  = parseDate(n.savedAt);
+            const ds = d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+            return `<div class="rp-note-item">
+              <div class="rp-note-meta">General Note · ${ds}</div>
+              <div class="rp-note-text">${n.note}</div>
+            </div>`;
+          }).join('')
+        : '';
+    } catch { generalNotesList.innerHTML = ''; }
+
+    // Save handler
+    saveBtn.onclick = async () => {
+      const note = noteText.value.trim();
+      if (!note) return;
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving…';
+      try {
+        await apiFetch(`/api/rep-notes/${repId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ note }),
+        });
+        saveBtn.textContent = '✓ Saved';
+        noteText.value = '';
+        setTimeout(() => { saveBtn.textContent = 'Save Note'; saveBtn.disabled = false; }, 2000);
+        renderProfileNotes(repId);
+      } catch (err) {
+        showError('Failed to save note: ' + err.message);
+        saveBtn.textContent = 'Save Note';
+        saveBtn.disabled = false;
+      }
+    };
+  }
+
+  // ─── Manager / My View Toggle ─────────────────────────────────────────────────
+  function initViewToggle() {
+    const stored = localStorage.getItem('myViewRepId');
+    if (stored) {
+      myViewRepId = stored;
+      $viewModeBtn.textContent = 'My View';
+      $viewModeBtn.classList.add('btn-view-active');
+      $myViewRepSel.classList.remove('hidden');
+      $myViewRepSel.value = stored;
+    }
+
+    $viewModeBtn.addEventListener('click', () => {
+      if (myViewRepId) {
+        myViewRepId = null;
+        localStorage.removeItem('myViewRepId');
+        $viewModeBtn.textContent = 'Manager View';
+        $viewModeBtn.classList.remove('btn-view-active');
+        $myViewRepSel.classList.add('hidden');
+      } else {
+        const firstId = $myViewRepSel.value || appData.config.reps[0]?.userId;
+        if (!firstId) return;
+        myViewRepId = firstId;
+        localStorage.setItem('myViewRepId', myViewRepId);
+        $myViewRepSel.value = myViewRepId;
+        $viewModeBtn.textContent = 'My View';
+        $viewModeBtn.classList.add('btn-view-active');
+        $myViewRepSel.classList.remove('hidden');
+      }
+      renderCommandCenter();
+      renderCallLog();
+      renderSmsList();
+      renderSpiff();
+    });
+
+    $myViewRepSel.addEventListener('change', () => {
+      myViewRepId = $myViewRepSel.value || null;
+      if (myViewRepId) localStorage.setItem('myViewRepId', myViewRepId);
+      else localStorage.removeItem('myViewRepId');
+      renderCommandCenter();
+      renderCallLog();
+      renderSmsList();
+      renderSpiff();
     });
   }
 

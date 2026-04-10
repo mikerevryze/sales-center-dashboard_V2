@@ -1038,6 +1038,105 @@ app.get('/api/conversations/:conversationId/thread', async (req, res) => {
   }
 });
 
+// ─── Rep Notes ───────────────────────────────────────────────────────────────
+const REP_NOTES_FILE = path.join(__dirname, 'rep-notes.json');
+
+async function loadRepNotes() {
+  if (!(await fse.pathExists(REP_NOTES_FILE))) {
+    await fse.writeJson(REP_NOTES_FILE, {}, { spaces: 2 });
+    return {};
+  }
+  return fse.readJson(REP_NOTES_FILE);
+}
+
+// GET /api/reps/:repId/pipeline-stats?locationId=
+app.get('/api/reps/:repId/pipeline-stats', async (req, res) => {
+  try {
+    const { repId } = req.params;
+    const { locationId } = req.query;
+    if (!locationId) return res.status(400).json({ error: 'locationId required' });
+
+    const cacheKey = `${locationId}__`;
+    const cachedEntry = oppsCache.get(cacheKey);
+    const opps = cachedEntry ? (cachedEntry.data.opportunities || []) : [];
+
+    const repOpps = opps.filter(o =>
+      o.assignedTo === repId ||
+      (Array.isArray(o.followers) && o.followers.includes(repId))
+    );
+
+    const stageCounts = {};
+    repOpps.forEach(o => {
+      const name = o.pipelineStageName || o.pipelineStageId || 'Unknown';
+      stageCounts[name] = (stageCounts[name] || 0) + 1;
+    });
+
+    res.json({ stageCounts, total: repOpps.length });
+  } catch (err) {
+    console.error('GET /api/reps/:repId/pipeline-stats error:', err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// GET /api/reps/:repId/appointments?locationId=
+app.get('/api/reps/:repId/appointments', async (req, res) => {
+  try {
+    const { repId } = req.params;
+    const { locationId } = req.query;
+    if (!locationId) return res.status(400).json({ error: 'locationId required' });
+
+    const clientsData = await loadClientsConfig();
+    const client = findClient(clientsData.clients, locationId);
+    const apiKey = resolveLocationKey(client);
+
+    const now = Date.now();
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    const url = `${GHL_API}/calendars/events?locationId=${locationId}&userId=${repId}&startTime=${now}&endTime=${now + thirtyDaysMs}`;
+
+    let data;
+    try {
+      data = await ghlGet(url, locationHeaders(apiKey));
+    } catch (e) {
+      console.warn(`[appointments] calendar API: ${e.message}`);
+      data = { events: [] };
+    }
+
+    res.json({ events: data.events || [] });
+  } catch (err) {
+    console.error('GET /api/reps/:repId/appointments error:', err.message);
+    res.status(err.status || 500).json({ error: err.message, events: [] });
+  }
+});
+
+// GET /api/rep-notes/:repId
+app.get('/api/rep-notes/:repId', async (req, res) => {
+  try {
+    const { repId } = req.params;
+    const notes = await loadRepNotes();
+    res.json({ notes: notes[repId] || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/rep-notes/:repId
+app.post('/api/rep-notes/:repId', async (req, res) => {
+  try {
+    const { repId } = req.params;
+    const { note } = req.body;
+    if (!note) return res.status(400).json({ error: 'note required' });
+
+    const notes = await loadRepNotes();
+    if (!notes[repId]) notes[repId] = [];
+    notes[repId].unshift({ note, savedAt: new Date().toISOString() });
+    if (notes[repId].length > 50) notes[repId] = notes[repId].slice(0, 50);
+    await fse.writeJson(REP_NOTES_FILE, notes, { spaces: 2 });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Fallback to index.html ─────────────────────────────────────────────────
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

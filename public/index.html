@@ -42,6 +42,10 @@
       </button>
     </nav>
     <div class="header-right">
+      <div class="view-mode-wrap">
+        <button id="view-mode-btn" class="btn-view-mode">Manager View</button>
+        <select id="my-view-rep-select" class="ctrl-select hidden" style="font-size:12px;padding:4px 8px;min-width:110px"></select>
+      </div>
       <button id="refresh-btn" class="btn-refresh" title="Refresh data">
         <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg>
       </button>
@@ -73,26 +77,56 @@
   </div>
   <div id="settings-overlay" class="modal-overlay hidden"></div>
 
-  <!-- ─── Rep Profile Modal ───────────────────────────────────────────────── -->
-  <div id="rep-modal-overlay" class="modal-overlay hidden"></div>
-  <div id="rep-profile-modal" class="rep-profile-modal hidden">
-    <div class="rep-modal-header">
-      <button id="rep-modal-close" class="btn-icon">✕</button>
-    </div>
-    <div class="rep-modal-hero">
-      <div id="rep-modal-avatar" class="rep-modal-avatar">?</div>
-      <div>
-        <div id="rep-modal-name" class="rep-modal-name">Rep Name</div>
-        <div id="rep-modal-sub" class="rep-modal-sub"></div>
+  <!-- ─── Rep Profile Panel (slide-in from right) ─────────────────────────── -->
+  <div id="rep-panel-overlay" class="modal-overlay hidden"></div>
+  <div id="rep-panel" class="rep-panel">
+    <div class="rep-panel-hdr">
+      <div class="rp-hero">
+        <div class="rp-avatar-wrap">
+          <div id="rp-avatar" class="rp-avatar">?</div>
+          <span class="rp-online-dot"></span>
+        </div>
+        <div class="rp-hero-info">
+          <div id="rp-name" class="rp-name">—</div>
+          <div id="rp-sub" class="rp-sub"></div>
+        </div>
       </div>
+      <button id="rep-panel-close" class="btn-icon" style="font-size:18px;padding:8px">✕</button>
     </div>
-    <div id="rep-modal-stats" class="rep-modal-stats"></div>
-    <div class="rep-modal-section-label">Top AI-Scored Calls</div>
-    <div id="rep-modal-top-calls" class="rep-modal-call-list"></div>
-    <div class="rep-modal-section-label" style="margin-top:12px">Recent Calls</div>
-    <div id="rep-modal-all-calls" class="rep-modal-call-list"></div>
-    <div style="padding:12px 16px;border-top:1px solid var(--border)">
-      <button id="rep-modal-view-btn" class="btn-save-note" style="width:100%">View All Calls in Calls Tab →</button>
+    <div id="rp-stats" class="rp-stats-row"></div>
+    <div class="rp-tabs">
+      <button class="rp-tab active" data-rp-tab="pipeline">Pipeline</button>
+      <button class="rp-tab" data-rp-tab="appointments">Appointments</button>
+      <button class="rp-tab" data-rp-tab="calls">Calls</button>
+      <button class="rp-tab" data-rp-tab="sms">SMS</button>
+      <button class="rp-tab" data-rp-tab="scores">Scores</button>
+      <button class="rp-tab" data-rp-tab="notes">Notes</button>
+    </div>
+    <div class="rp-content">
+      <div id="rp-pane-pipeline" class="rp-pane"></div>
+      <div id="rp-pane-appointments" class="rp-pane rp-pane-hidden"></div>
+      <div id="rp-pane-calls" class="rp-pane rp-pane-hidden">
+        <div class="rp-search-wrap">
+          <input id="rp-calls-search" class="ctrl-input" type="text" placeholder="Search contact…" style="width:100%" />
+        </div>
+        <div id="rp-calls-list" class="call-list rp-call-list"></div>
+      </div>
+      <div id="rp-pane-sms" class="rp-pane rp-pane-hidden">
+        <div id="rp-sms-list" class="call-list rp-call-list"></div>
+      </div>
+      <div id="rp-pane-scores" class="rp-pane rp-pane-hidden">
+        <div id="rp-avg-score" class="rp-avg-score-wrap"></div>
+        <div id="rp-scores-list" class="call-list rp-call-list"></div>
+      </div>
+      <div id="rp-pane-notes" class="rp-pane rp-pane-hidden">
+        <div id="rp-call-notes-list"></div>
+        <div class="detail-section rp-add-note">
+          <div class="detail-section-label">Add General Note</div>
+          <textarea id="rp-general-note-text" class="note-textarea" rows="3" placeholder="Add a coaching or performance note for this rep…"></textarea>
+          <button id="rp-save-general-note" class="btn-save-note" style="margin-top:8px;width:100%">Save Note</button>
+        </div>
+        <div id="rp-general-notes-list"></div>
+      </div>
     </div>
   </div>
 
