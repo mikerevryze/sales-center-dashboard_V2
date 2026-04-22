@@ -242,5 +242,66 @@
       ]
     },
     "aiAnalyzedAt": "2026-04-10T01:45:35.439Z"
+  },
+  "BBSQGTB2T6LwhoiU0TOv": {
+    "conversationId": "URKDm8HbJH2xTYs8Qm3Q",
+    "aiAnalysis": {
+      "score": 6,
+      "summary": "The rep handled an inbound/outbound call professionally and successfully booked a follow-up appointment for 6:30 PM the next day. However, the call lacked depth in discovery (no questions about fitness goals, budget, or timeline) and missed an opportunity to build urgency around the founding membership offer before rushing to the appointment set.",
+      "keyMoments": [
+        {
+          "type": "Opening",
+          "description": "Rep introduced themselves clearly as Stephanie with Strong Pilates and immediately pivoted to booking an appointment to discuss founding memberships."
+        },
+        {
+          "type": "Discovery",
+          "description": "Lead asked clarifying questions about location (Westlake) and whether it was new. Rep confirmed it's a pre-opening franchise with discounted founding memberships."
+        },
+        {
+          "type": "Objection Handling",
+          "description": "When lead mentioned never doing Pilates before, rep effectively reframed it as beginner-friendly and low-impact on joints, turning hesitation into opportunity."
+        },
+        {
+          "type": "Close Attempt",
+          "description": "Rep successfully set a follow-up call for the next day at 6:30 PM with a team member (Steph) to discuss memberships in detail."
+        }
+      ],
+      "coachingTip": "Great job booking the appointment and handling the Pilates objection! Next time, ask 1-2 quick discovery questions (e.g., 'What are your fitness goals?' or 'Have you been looking to try something new?') before setting the appointment—this builds rapport and gives your closer valuable context.",
+      "labeledTranscript": [
+        {
+          "speaker": "Rep",
+          "text": "Hi. It's Faith? Yes. Hi. This is Steph with Strong Pilates. How are you doing today?"
+        },
+        {
+          "speaker": "Lead",
+          "text": "Hey, Stephanie. How are you?"
+        },
+        {
+          "speaker": "Rep",
+          "text": "So I just wanted to see if you wanted to book a appointment with one of my team members just to talk about all the founding memberships that we have going on."
+        },
+        {
+          "speaker": "Lead",
+          "text": "Sorry. Where is the location again?"
+        },
+        {
+          "speaker": "Rep",
+          "text": "We're in Westlake. Yes, ma'am. We haven't opened right now. So, currently, we're having foundries memberships where you can lock in a cheaper rate before we do open."
+        },
+        {
+          "speaker": "Lead",
+          "text": "I've never done Pilates before. Yeah. Well, that sounds amazing."
+        },
+        {
+          "speaker": "Rep",
+          "text": "I mean, most of our customers are new time comers. It is the best way to start working out your body a little bit without putting a lot of damage on your joints."
+        },
+        {
+          "speaker": "Lead",
+          "text": "Maybe if they can call me today after six. Tomorrow after six?"
+        }
+      ]
+    },
+    "aiAnalyzedAt": "2026-04-15T13:59:31.902Z"
   }
 }
