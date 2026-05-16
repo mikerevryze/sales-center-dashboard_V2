@@ -6,6 +6,7 @@
   const $loadingMsg       = document.getElementById('loading-msg');
   const $errorBanner      = document.getElementById('error-banner');
   const $refreshBtn       = document.getElementById('refresh-btn');
+  const $statusPill       = document.getElementById('status-pill');
 
   const $navTabs          = document.querySelectorAll('.nav-tab');
   const $tabSections      = document.querySelectorAll('.tab-section');
@@ -123,6 +124,8 @@
   };
   const smsFilters = { clientId: 'all', search: '', outcome: 'all' };
 
+  let initialLoading       = true;
+  let refreshStatusPollTimer = null;
   let currentCallConvId    = null;
   let currentCallLocId     = null;
   let currentMessageId     = null;
@@ -139,6 +142,37 @@
     $errorBanner.textContent = msg;
     $errorBanner.classList.remove('hidden');
     setTimeout(() => $errorBanner.classList.add('hidden'), 10000);
+  }
+
+  function updateStatusPill(state) {
+    if (!$statusPill) return;
+    if (state === 'refreshing') {
+      $statusPill.classList.remove('hidden');
+      $statusPill.innerHTML = '<span class="spinner"></span>\u00a0Refreshing data\u2026';
+    } else if (state === 'done') {
+      $statusPill.classList.remove('hidden');
+      const hhmm = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      $statusPill.textContent = `Up to date \u00b7 ${hhmm}`;
+      setTimeout(() => $statusPill.classList.add('hidden'), 8000);
+    } else {
+      $statusPill.classList.add('hidden');
+    }
+  }
+
+  function startRefreshStatusPoll() {
+    if (refreshStatusPollTimer) clearInterval(refreshStatusPollTimer);
+    refreshStatusPollTimer = setInterval(async () => {
+      try {
+        const { refreshing } = await apiFetch('/api/refresh-status');
+        if (refreshing && refreshing.length > 0) {
+          updateStatusPill('refreshing');
+        } else {
+          updateStatusPill('done');
+          clearInterval(refreshStatusPollTimer);
+          refreshStatusPollTimer = null;
+        }
+      } catch { /* ignore */ }
+    }, 5000);
   }
 
   async function apiFetch(path, opts) {
@@ -333,7 +367,9 @@
   }
 
   async function fetchAll() {
-    $loadingOverlay.classList.remove('hidden');
+    $loadingOverlay.classList.add('hidden');
+    updateStatusPill('refreshing');
+    initialLoading = true;
     try {
       const [config, notes, rubric] = await Promise.all([
         apiFetch('/api/config'),
@@ -348,44 +384,69 @@
       populateSelects();
       if (!viewToggleReady) { initViewToggle(); viewToggleReady = true; }
 
-      const clientCount = config.clients.length;
-      $loadingMsg.textContent = `Fetching data for ${clientCount} client${clientCount > 1 ? 's' : ''}…`;
-
-      const results = await Promise.allSettled(
-        config.clients.map(cl => fetchClientData(cl))
-      );
-
+      // Render immediately with empty data (skeleton state shown in leaderboards)
       appData.opportunities = [];
       appData.calls = [];
       appData.smsConvos = [];
-
-      results.forEach((r, i) => {
-        if (r.status === 'fulfilled' && r.value) {
-          appData.opportunities.push(...(r.value.opportunities || []));
-          const calls = (r.value.calls || []).map(c => ({ ...c, _clientId: config.clients[i].locationId }));
-          appData.calls.push(...calls);
-          appData.smsConvos.push(...(r.value.sms || []));
-        } else if (r.status === 'rejected') {
-          console.warn('[fetchAll] client error:', r.reason);
-        }
-      });
-
-      buildContactMaps();
-      logFetchedUsers();
-
       renderCommandCenter();
       renderCallLog();
       renderSmsList();
+
+      // Fetch clients incrementally — re-render as each one resolves
+      await Promise.allSettled(
+        config.clients.map(cl =>
+          fetchClientData(cl).then(value => {
+            if (!value) return;
+            appData.opportunities.push(...(value.opportunities || []));
+            const clCalls = (value.calls || []).map(c => ({ ...c, _clientId: cl.locationId }));
+            appData.calls.push(...clCalls);
+            appData.smsConvos.push(...(value.sms || []));
+            initialLoading = false;
+            buildContactMaps();
+            renderCommandCenter();
+            renderCallLog();
+            renderSmsList();
+          }).catch(e => console.warn('[fetchAll] client error:', e))
+        )
+      );
+
+      initialLoading = false;
+      buildContactMaps();
+      logFetchedUsers();
       buildSpiffWeekOptions();
       renderSpiff();
-
+      renderCommandCenter();
+      renderCallLog();
+      renderSmsList();
       populateRubricEditor();
+      updateStatusPill('done');
+
+      // Background extend fetch — pull fuller call history (page 3-5) for each client
+      config.clients.forEach(cl => {
+        fetch(`/api/locations/${cl.locationId}/calls?extend=1`)
+          .then(r => r.json())
+          .then(data => {
+            if (!data.hasMore) return;
+            const existing = new Set(appData.calls.map(c => c.conversationId));
+            const newCalls = (data.calls || [])
+              .filter(c => !existing.has(c.conversationId))
+              .map(c => ({ ...c, _clientId: cl.locationId }));
+            if (newCalls.length > 0) {
+              appData.calls.push(...newCalls);
+              buildContactMaps();
+              renderCommandCenter();
+              renderCallLog();
+            }
+          })
+          .catch(() => {});
+      });
+
+      startRefreshStatusPoll();
     } catch (err) {
-      console.error('[fetchAll] error:', err && err.message ? err.message : String(err));
-      console.error('[fetchAll] stack:', err && err.stack);
-      showError('Failed to load data: ' + (err && err.message ? err.message : String(err)));
-    } finally {
-      $loadingOverlay.classList.add('hidden');
+      console.error('[fetchAll] error:', err?.message || String(err));
+      showError('Failed to load data: ' + (err?.message || String(err)));
+      initialLoading = false;
+      updateStatusPill('done');
     }
   }
 
@@ -532,12 +593,16 @@
     renderClientLeaderboard(wonOpps, calls);
   }
 
-  // Fix 2, 3, 6: wonOpps already filtered by lastStageChangeAt; uses getOppRepId(); monetaryValue > 0 only
   function renderRepLeaderboard(wonOpps, calls) {
     const sort = $repSort.value;
     const reps = myViewRepId
       ? appData.config.reps.filter(r => r.userId === myViewRepId)
       : appData.config.reps;
+
+    if (reps.length === 0 && initialLoading) {
+      $repLbList.innerHTML = [1, 2, 3].map(() => '<div class="skeleton-row"></div>').join('');
+      return;
+    }
 
     const rows = reps.map(r => {
       const rWon   = wonOpps.filter(o => getOppRepId(o) === r.userId);
@@ -583,41 +648,91 @@
     });
   }
 
-  // Fix 1, 3, 5: wonOpps by lastStageChangeAt; monetaryValue > 0; close rate sanity
   function renderClientLeaderboard(wonOpps, calls) {
     const sort = $clientSort.value;
     const clients = appData.config.clients;
 
-    const rows = clients.map(cl => {
-      const cWon   = wonOpps.filter(o => o.locationId === cl.locationId);
-      const cCalls = calls.filter(c => c._clientId === cl.locationId);
-      const sold   = cWon.length;
-      const rev    = cWon.reduce((s, o) => s + (o.monetaryValue > 0 ? o.monetaryValue : 0), 0);
-      let rate = '—';
-      if (cCalls.length > 0) {
-        const raw = (sold / cCalls.length) * 100;
-        if (raw <= 100) rate = raw.toFixed(1) + '%';
-        else console.warn('[closeRate] client sanity:', cl.name, raw.toFixed(1) + '%');
+    if (!clients.length && initialLoading) {
+      $clientLbList.innerHTML = [1, 2, 3].map(() => '<div class="skeleton-row"></div>').join('');
+      return;
+    }
+
+    const rows = [];
+
+    clients.forEach(cl => {
+      const clOpps    = appData.opportunities.filter(o => o.locationId === cl.locationId);
+      const clWonOpps = wonOpps.filter(o => o.locationId === cl.locationId);
+      const clCalls   = calls.filter(c => c._clientId === cl.locationId);
+
+      if (!cl.pipelines || cl.pipelines.length === 0) {
+        const sold  = clWonOpps.length;
+        const rev   = clWonOpps.reduce((s, o) => s + (o.monetaryValue > 0 ? o.monetaryValue : 0), 0);
+        const nCalls = clCalls.length;
+        let rate = '—';
+        if (nCalls > 0) { const raw = (sold / nCalls) * 100; if (raw <= 100) rate = raw.toFixed(1) + '%'; }
+        rows.push({ type: 'client', label: cl.name, sublabel: null, sold, rev, rate, nCalls, locationId: cl.locationId, pipelineId: null });
+        return;
       }
-      return { cl, sold, rev, rate, calls: cCalls.length };
+
+      // Build contactId → { pipelineId, date } map using most-recent opp per contact
+      const contactPipelineMap = {};
+      clOpps.forEach(o => {
+        if (!o.contactId || !o.pipelineId) return;
+        const d = parseDate(o.lastStageChangeAt);
+        const ex = contactPipelineMap[o.contactId];
+        if (!ex || (d && (!ex.date || d > ex.date))) {
+          contactPipelineMap[o.contactId] = { pipelineId: o.pipelineId, date: d };
+        }
+      });
+
+      // Bucket calls by attributed pipeline
+      const callsByPipeline = {};
+      cl.pipelines.forEach(p => { callsByPipeline[p.pipelineId] = []; });
+      const unattributedCalls = [];
+      clCalls.forEach(c => {
+        const attr = c.contactId && contactPipelineMap[c.contactId];
+        if (attr && callsByPipeline[attr.pipelineId] !== undefined) {
+          callsByPipeline[attr.pipelineId].push(c);
+        } else {
+          unattributedCalls.push(c);
+        }
+      });
+
+      cl.pipelines.forEach(p => {
+        const pWon   = clWonOpps.filter(o => o.pipelineId === p.pipelineId);
+        const pCalls = callsByPipeline[p.pipelineId] || [];
+        const sold   = pWon.length;
+        const rev    = pWon.reduce((s, o) => s + (o.monetaryValue > 0 ? o.monetaryValue : 0), 0);
+        const nCalls = pCalls.length;
+        let rate = '—';
+        if (nCalls > 0) { const raw = (sold / nCalls) * 100; if (raw <= 100) rate = raw.toFixed(1) + '%'; }
+        rows.push({ type: 'pipeline', label: p.name, sublabel: cl.name, sold, rev, rate, nCalls, locationId: cl.locationId, pipelineId: p.pipelineId });
+      });
+
+      if (unattributedCalls.length > 0) {
+        rows.push({ type: 'unattributed', label: `Unattributed — ${cl.name}`, sublabel: null, sold: 0, rev: 0, rate: '—', nCalls: unattributedCalls.length, locationId: cl.locationId, pipelineId: null });
+      }
     });
 
     rows.sort((a, b) => {
+      if (a.type === 'unattributed' && b.type !== 'unattributed') return 1;
+      if (b.type === 'unattributed' && a.type !== 'unattributed') return -1;
       if (sort === 'sold')      return b.sold - a.sold;
       if (sort === 'revenue')   return b.rev - a.rev;
-      if (sort === 'closeRate') return parseFloat(b.rate) - parseFloat(a.rate);
+      if (sort === 'closeRate') return (parseFloat(b.rate) || 0) - (parseFloat(a.rate) || 0);
       return 0;
     });
 
     $clientLbList.innerHTML = rows.map((row, i) => `
-      <div class="lb-row">
-        <span class="lb-rank">${i + 1}</span>
+      <div class="lb-row" data-loc="${row.locationId || ''}" data-pip="${row.pipelineId || ''}">
+        <span class="lb-rank">${row.type !== 'unattributed' ? i + 1 : ''}</span>
         <div class="lb-avatar" style="background:#1e2a2a;color:var(--accent)">
-          ${(row.cl.name || '?')[0].toUpperCase()}
+          ${(row.label || '?')[0].toUpperCase()}
         </div>
         <div class="lb-info">
-          <div class="lb-name">${row.cl.name}</div>
-          <div class="lb-sub">${row.calls} calls</div>
+          <div class="lb-name">${row.label}</div>
+          ${row.sublabel ? `<div class="lb-sub" style="font-size:10px;opacity:0.7">${row.sublabel}</div>` : ''}
+          <div class="lb-sub">${row.nCalls} calls</div>
         </div>
         <div class="lb-right">
           <div class="lb-val">${row.sold}</div>
@@ -625,6 +740,19 @@
         </div>
       </div>
     `).join('');
+
+    $clientLbList.querySelectorAll('.lb-row[data-loc]').forEach(el => {
+      if (!el.dataset.loc) return;
+      el.addEventListener('click', () => {
+        const locId = el.dataset.loc;
+        const pipId = el.dataset.pip;
+        ccFilters.clientId   = locId || 'all';
+        ccFilters.pipelineId = pipId || 'all';
+        if ($ccClientSelect)   $ccClientSelect.value   = locId || 'all';
+        if ($ccLocationSelect) $ccLocationSelect.value = pipId || 'all';
+        renderCommandCenter();
+      });
+    });
   }
 
   // ─── Calls Tab ───────────────────────────────────────────────────────────────

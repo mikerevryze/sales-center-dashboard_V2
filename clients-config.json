@@ -22,6 +22,14 @@
         { "pipelineId": "Kz0hjzNRc8312nZQMOMw", "name": "Santa Monica" },
         { "pipelineId": "acDfCLF5rfk6FO9Wwns5", "name": "West Lake" }
       ]
+    },
+    {
+      "locationId": "xVsFO5zq3lYDLCT4uRAI",
+      "name": "STRONG Pilates — Central Austin",
+      "apiKeyEnvVar": "GHL_KEY_SP_CENTRAL_AUSTIN",
+      "pipelines": [
+        { "pipelineId": "JCa5jk8KV2hcI9wIRpqN", "name": "Central Austin" }
+      ]
     }
   ]
 }

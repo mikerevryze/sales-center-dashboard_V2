@@ -58,6 +58,34 @@ body {
 }
 .spinner-lg { width: 32px; height: 32px; border-width: 3px; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Status Pill ─────────────────────────────────────────────────────────── */
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text);
+  background: var(--accent2);
+  border: 1px solid rgba(0, 245, 160, 0.2);
+  border-radius: 20px;
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+.status-pill .spinner { width: 10px; height: 10px; border-width: 1.5px; }
+
+/* ─── Skeleton Rows ───────────────────────────────────────────────────────── */
+@keyframes pulse {
+  0%, 100% { opacity: 0.25; }
+  50%       { opacity: 0.55; }
+}
+.skeleton-row {
+  height: 40px;
+  background: var(--border);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
 .loading-row {
   display: flex;
   align-items: center;

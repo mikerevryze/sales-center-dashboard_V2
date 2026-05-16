@@ -1,0 +1,256 @@
+# Revryze Sales Center — Pipeline-as-Location + Reps Roster + Performance Pass
+
+Apply ALL of the following changes to the `sales-center-dashboard_V2` app in a single pass. Each change is numbered. Write every file completely — no placeholders, no stubs.
+
+---
+
+## Change 1 — Add new sub-account: STRONG Pilates Central Austin
+
+In `clients-config.json`, append this entry to the `clients` array (keep every existing entry intact, do not reorder):
+
+```json
+{
+  "locationId": "xVsFO5zq3lYDLCT4uRAI",
+  "name": "STRONG Pilates — Central Austin",
+  "apiKeyEnvVar": "GHL_KEY_SP_CENTRAL_AUSTIN",
+  "pipelines": [
+    { "pipelineId": "JCa5jk8KV2hcI9wIRpqN", "name": "Central Austin" }
+  ]
+}
+```
+
+The matching Replit Secret `GHL_KEY_SP_CENTRAL_AUSTIN` will be added separately. **If the env var is missing at request time, log a warning and skip that client gracefully — do not throw 503.** Update `resolveLocationKey()` in `server.js` so a missing key returns `null` and the caller skips that client instead of failing the whole `Promise.allSettled` batch.
+
+---
+
+## Change 2 — Replace `reps-config.json` with the full current Revryze roster
+
+**Replace the entire `reps` array in `reps-config.json`** with the list below. This is the complete current rep roster — any reps currently in the file but NOT in this list should be removed (they are stale or no longer with the team).
+
+```json
+{
+  "reps": [
+    {
+      "userId": "9TfYSyN5mvLpZOeRiYOC",
+      "name": "Craig Warner",
+      "email": "cwarner@revryze.com",
+      "title": "Director of Revenue"
+    },
+    {
+      "userId": "vgSUE4Pge6IdDIqHTB4x",
+      "name": "Gabriella Childress",
+      "email": "gchildress@revryze.com"
+    },
+    {
+      "userId": "bpZXjQWRBR4BX16FfiVY",
+      "name": "Jon Moore",
+      "email": "jmoore@revryze.com"
+    },
+    {
+      "userId": "oabT68dsQoFltr4U6YMN",
+      "name": "Mallorie Baker",
+      "email": "mbaker@revryze.com"
+    },
+    {
+      "userId": "WNgoIMUX6p5jBzqdIQdM",
+      "name": "Stefanie Gold",
+      "email": "sgoldschmidt@revryze.com"
+    },
+    {
+      "userId": "9bH8qus9fRKZ3AiHojnf",
+      "name": "Stephanie Smith",
+      "email": "ssmith@revryze.com"
+    }
+  ]
+}
+```
+
+Notes:
+
+- Use `userId` (not `id`) as the GHL user ID field on every entry. The `loadConfig` normalization should leave these untouched.
+- The `title` field is new and currently only set on Craig Warner. Add `title` as an optional, unrequired field in any rep typedef/docstring. **Do not block rendering** if the field is absent.
+- After saving, hit `GET /api/debug/repids` and confirm every rep above shows `matchFound: true` once at least one location's calls cache is warm. If any rep shows `matchFound: false` and `callCount: 0`, the userId may have been transcribed slightly wrong from screenshots (`I` vs `l` confusion); flag those in the response so the user can hand-verify against `/api/all-users`.
+
+---
+
+## Change 3 — Restructure Client Leaderboard: every pipeline as its own row
+
+Currently the Command Center Client Leaderboard shows one row per sub-account. Change it to show one row per **pipeline** across **every** sub-account.
+
+### Expected rows after this change
+
+- Highland Village — *STRONG Pilates Momentic*
+- Lakeview — *STRONG Pilates Momentic*
+- Santa Monica — *STRONG Pilates Momentic*
+- West Lake — *STRONG Pilates Momentic*
+- Central Austin — *STRONG Pilates Central Austin*
+- 4Ever Franchisor LLC *(no pipelines configured — render as a single row)*
+- Texas Longevity Lab Corp *(no pipelines configured — render as a single row)*
+
+### Row structure
+
+Each row displays:
+
+- **Primary label**: `pipeline.name`
+- **Sub label**: `client.name` in muted/`var(--sub)` text
+- **Sold**: count of opps where `locationId === client.locationId` AND `pipelineId === pipeline.pipelineId` AND `status === 'won'` AND `lastStageChangeAt` falls inside the active date filter
+- **Revenue**: sum of `monetaryValue` from those won opps where `monetaryValue > 0`
+- **Calls**: count of calls where `_clientId === client.locationId` AND the call's `contactId` has at least one opp in `pipeline.pipelineId`. If a contact has opps in multiple pipelines, attribute the call to the pipeline of that contact's **most recent** opp by `lastStageChangeAt`. Calls whose contact has no opps in any pipeline at this location should NOT be silently dropped — bucket them in a single trailing row labeled `"Unattributed — {clientName}"` so totals always reconcile.
+- **Close rate**: `sold / calls * 100`, capped at 100%, render `—` when calls = 0
+
+### Empty-pipelines fallback
+
+For clients with `pipelines: []` (currently 4Ever and Texas Longevity), render exactly **one** row using `client.name` as the primary label, no sub label, and use the client's full unscoped data.
+
+### Sort & click behavior
+
+- Reuse the existing sort dropdown (Memberships Sold / Revenue / Close Rate). Default to Memberships Sold descending.
+- Clicking a pipeline row sets `ccFilters.clientId = client.locationId` AND `ccFilters.pipelineId = pipeline.pipelineId`, then re-renders. Clicking the Unattributed row sets only `ccFilters.clientId`.
+
+### Filter dropdowns
+
+Update `#cc-location-select` in `index.html` AND its populate logic in `app.js` so each option's text reads `"{clientName} — {pipelineName}"` and its value is `pipelineId`. Keep "All pipelines" as the first option.
+
+### Reconciliation sanity check
+
+After this change, Strong Pilates Momentic's 20 sold from the current dashboard should distribute across its 4 pipeline rows and sum back to 20. If the four rows sum to less than 20, the missing opps are in the Unattributed row.
+
+---
+
+## Change 4 — Performance: persistent enrichment cache
+
+Root cause of the slow load: `/api/locations/:locationId/calls` sequentially fetches messages for **every** conversation with a 300ms delay (500 calls × 300ms = 2.5 minutes per location). Fix this with a disk-backed enrichment cache plus parallelization.
+
+### Add `calls-cache.json` persistent store
+
+Create `calls-cache.json` at project root with this schema, keyed by `conversationId`:
+
+```json
+{
+  "conv_abc123": {
+    "messageId": "msg_xyz",
+    "duration": 245,
+    "status": "completed",
+    "userId": "user_123",
+    "enrichedAt": "2026-05-16T10:00:00Z"
+  }
+}
+```
+
+On server start, load this into a `Map` named `callEnrichmentCache`. Write to disk every 50 new enrichments AND once at the end of each `/api/locations/:locationId/calls` request that performed any enrichment. Use `fs-extra.writeJson` with `{ spaces: 2 }`.
+
+### Cache-first enrichment flow
+
+In `/api/locations/:locationId/calls`, after building the initial `callObjects` array from `conversations/search`, for each conversation:
+
+1. Look up `callEnrichmentCache.get(conv.id)` first
+2. If present AND `enrichedAt` is less than 7 days old → apply cached `{ messageId, duration, status, userId }` directly to the call object, **skip the API call entirely**
+3. Otherwise add to a `needsEnrichment` array
+
+### Parallelize the `needsEnrichment` batch with concurrency = 8
+
+Replace the existing `for (let i = 0; i < callObjects.length; i++) { await sleep(300); ... }` loop with this inline helper (do not add npm packages):
+
+```javascript
+async function enrichWithConcurrency(items, fn, concurrency = 8) {
+  const results = new Array(items.length);
+  let cursor = 0;
+  await Promise.all(
+    Array.from({ length: concurrency }, async () => {
+      while (cursor < items.length) {
+        const idx = cursor++;
+        try { results[idx] = await fn(items[idx], idx); }
+        catch (e) { results[idx] = null; }
+      }
+    })
+  );
+  return results;
+}
+```
+
+On 429 from a single conversation, back off 3 seconds and retry once. If it fails again, skip that one and continue — **never let one bad conversation block the whole batch**.
+
+After enrichment completes, write the newly enriched entries into `callEnrichmentCache` and persist to `calls-cache.json`.
+
+### Stale-while-revalidate on the calls endpoint
+
+Replace the current hard 5-minute TTL on the in-memory `callsCache` with stale-while-revalidate:
+
+1. If any cached data exists for the location → return it **immediately**, no matter how old
+2. If the cache is older than 5 minutes OR missing → trigger a background refresh that does NOT block the response
+3. Track in-flight refreshes in a `Set` (`refreshingLocations`) so two concurrent requests for the same location don't double-fetch
+
+Add `GET /api/refresh-status` that returns `{ refreshing: Array.from(refreshingLocations) }` so the frontend can show a status pill.
+
+### Add cache stats debug endpoint
+
+`GET /api/debug/cache-stats` returns:
+
+```json
+{
+  "totalCached": 1067,
+  "freshCount": 1067,
+  "staleCount": 0,
+  "oldestEntry": "2026-05-09T...",
+  "newestEntry": "2026-05-16T..."
+}
+```
+
+### Bump oppsCache TTL
+
+Change `oppsCache` TTL from 10 minutes to **30 minutes**. Opportunities change less frequently than calls and the won-opp scan is one of the slower fetches.
+
+---
+
+## Change 5 — Frontend: non-blocking initial render
+
+In `public/app.js`:
+
+1. **Remove the fullscreen blocking `#loading-overlay`** from `fetchAll()`. The dashboard should render immediately.
+2. **Add a small status pill** in the header next to the Refresh button. Initial state: `Refreshing data…` with the existing spinner. Final state: `Up to date · {HH:MM}`. CSS class `.status-pill`, sized small with `var(--accent2)` background.
+3. **Render incrementally.** Instead of awaiting `Promise.allSettled(...)` before any render, call `renderCommandCenter()` once with empty data, then as each `fetchClientData(cl)` resolves, push that client's data into `appData` and call the render functions again. This means Strong Pilates' data appears first and the other clients fill in as they complete.
+4. **Poll `/api/refresh-status` every 5 seconds** while any background refresh is in progress, and update the pill text accordingly.
+5. **Empty-state messaging.** While the leaderboards are still loading, show 3 placeholder skeleton rows (a 40px tall div with `background: var(--border)` and `animation: pulse 1.5s infinite`).
+
+---
+
+## Change 6 — Cap initial conversation fetch at 200; extend in background
+
+In `/api/locations/:locationId/calls`:
+
+1. On the first hit with no `extend` query param, paginate up to **2 pages** (200 calls max) instead of 5 pages (500 max). Return `{ calls, total, hasMore: true|false }`.
+2. When `?extend=1` is passed, paginate up to 5 pages as before and merge into the cache.
+3. In `app.js`, after the initial `fetchClientData` resolves, kick off a second background `fetch('/api/locations/:locationId/calls?extend=1')` for each client. When it returns, merge the new calls into `appData.calls` (dedupe by `conversationId`) and re-render the affected views.
+
+This brings cold-cache first paint roughly 3× faster while preserving the full 500-call ceiling.
+
+---
+
+## Verification checklist
+
+After applying all changes, manually verify:
+
+1. `GET /api/config` returns exactly **6 reps** matching the names above, every entry with a `userId` field.
+2. `GET /api/debug/repids` shows every rep with `matchFound: true` once at least one location's call cache is warm. Any rep showing `matchFound: false` should be flagged in the console output.
+3. `GET /api/debug/cache-stats` returns sensible numbers and `totalCached` grows after each refresh.
+4. `GET /api/refresh-status` returns `{ "refreshing": [] }` when idle and the locationIds when a refresh is running.
+5. The Client Leaderboard shows **7 rows** total (4 Momentic pipelines + 1 Central Austin + 4Ever + Texas Longevity).
+6. Strong Pilates Momentic's 20 sold are correctly distributed across its 4 pipeline rows. Highland Village + Lakeview + Santa Monica + West Lake + (any Unattributed) = 20.
+7. The Rep Leaderboard shows all 6 reps. Craig Warner appears even if he has 0 calls (he's the Director of Revenue — he stays on the board).
+8. First load on a warm cache completes in under 3 seconds. First load on a cold cache completes in under 30 seconds.
+9. Refreshing the page does NOT show a fullscreen blocking spinner. The dashboard renders with stale data, then the "Refreshing…" pill swaps to "Up to date" when the background refresh completes.
+10. The missing `GHL_KEY_SP_CENTRAL_AUSTIN` env var produces a console warning but does NOT crash the dashboard. Other clients continue to load.
+
+---
+
+## Do not change
+
+- Dark theme styling, color tokens, or CSS variables
+- Existing GHL API endpoint URLs, headers, or authentication
+- AI analysis (`/api/ai-analyze`), manager notes, rep profile slide-in panel, SPIFF tab, or SMS thread UI
+- `call-notes.json`, `rep-notes.json`, `scoring-rubric.json` file structures
+- Manager / My View toggle behavior or its localStorage key
+- The `oppsCache` cache key format (`{locationId}__{pipelineId||''}`)
+- The recording proxy at `/api/recording` or transcription proxy at `/api/transcription`
+
+Write every file completely. No placeholder comments, no TODOs.

@@ -15,6 +15,7 @@ const CLIENTS_CONFIG = path.join(__dirname, 'clients-config.json');
 const REPS_CONFIG = path.join(__dirname, 'reps-config.json');
 const CALL_NOTES_FILE = path.join(__dirname, 'call-notes.json');
 const SCORING_RUBRIC_FILE = path.join(__dirname, 'scoring-rubric.json');
+const CALLS_CACHE_FILE = path.join(__dirname, 'calls-cache.json');
 
 const DEFAULT_RUBRIC = `You are a sales call analyst for Revryze, a franchise presale membership company. Score this call out of 10 based on:
 - Opening (1pt): Did the rep introduce themselves clearly and professionally?
@@ -37,12 +38,16 @@ async function loadScoringRubric() {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// 5-minute in-memory cache for calls results per locationId
+// In-memory calls cache (stale-while-revalidate — returns cached data immediately, refreshes in background)
 const callsCache = new Map(); // locationId -> { data, timestamp }
-// 10-minute in-memory cache for opportunities per locationId
-const oppsCache = new Map(); // locationId -> { data, timestamp }
+// 30-minute in-memory cache for opportunities per locationId+pipelineId
+const oppsCache = new Map(); // locationId__pipelineId -> { data, timestamp }
 // 60-minute in-memory cache for pipeline stage names per locationId
 const stagesCache = new Map(); // locationId -> { map: { stageId: stageName }, timestamp }
+// Disk-backed enrichment cache: conversationId -> { messageId, duration, status, userId, enrichedAt }
+const callEnrichmentCache = new Map();
+// Set of locationIds currently being refreshed in the background
+const refreshingLocations = new Set();
 
 // Fetch stageId → stageName map for a location from GHL pipeline API (60-min cache)
 async function fetchStageNameMap(locationId, headers) {
@@ -63,6 +68,45 @@ async function fetchStageNameMap(locationId, headers) {
   } catch {
     return {};
   }
+}
+
+// ─── Disk-backed call enrichment cache helpers ────────────────────────────────
+async function loadCallEnrichmentCache() {
+  try {
+    if (await fse.pathExists(CALLS_CACHE_FILE)) {
+      const data = await fse.readJson(CALLS_CACHE_FILE);
+      Object.entries(data).forEach(([k, v]) => callEnrichmentCache.set(k, v));
+      console.log(`[enrichCache] Loaded ${callEnrichmentCache.size} entries from calls-cache.json`);
+    }
+  } catch (e) {
+    console.warn('[enrichCache] Failed to load calls-cache.json:', e.message);
+  }
+}
+
+async function persistCallEnrichmentCache() {
+  try {
+    const obj = {};
+    callEnrichmentCache.forEach((v, k) => { obj[k] = v; });
+    await fse.writeJson(CALLS_CACHE_FILE, obj, { spaces: 2 });
+  } catch (e) {
+    console.warn('[enrichCache] Failed to write calls-cache.json:', e.message);
+  }
+}
+
+// Concurrent enrichment helper (no extra npm packages)
+async function enrichWithConcurrency(items, fn, concurrency = 8) {
+  const results = new Array(items.length);
+  let cursor = 0;
+  await Promise.all(
+    Array.from({ length: concurrency }, async () => {
+      while (cursor < items.length) {
+        const idx = cursor++;
+        try { results[idx] = await fn(items[idx], idx); }
+        catch (e) { results[idx] = null; }
+      }
+    })
+  );
+  return results;
 }
 
 function agencyHeaders() {
@@ -111,9 +155,8 @@ async function loadRepsConfig() {
 function resolveLocationKey(client) {
   const key = process.env[client.apiKeyEnvVar];
   if (!key) {
-    const err = new Error(`Missing env var: ${client.apiKeyEnvVar}`);
-    err.status = 503;
-    throw err;
+    console.warn(`[config] Missing env var: ${client.apiKeyEnvVar} — skipping client "${client.name}"`);
+    return null;
   }
   return key;
 }
@@ -230,7 +273,7 @@ app.get('/api/locations/:locationId/opportunities', async (req, res) => {
     // filters get their own cache entry)
     const cacheKey = `${locationId}__${pipelineId || ''}`;
     const cachedOpps = oppsCache.get(cacheKey);
-    if (cachedOpps && (Date.now() - cachedOpps.timestamp) < 10 * 60 * 1000) {
+    if (cachedOpps && (Date.now() - cachedOpps.timestamp) < 30 * 60 * 1000) {
       console.log(`[opps] ${locationId} serving ${cachedOpps.data.total} opps from cache`);
       return res.json(cachedOpps.data);
     }
@@ -238,6 +281,7 @@ app.get('/api/locations/:locationId/opportunities', async (req, res) => {
     const clientsData = await loadClientsConfig();
     const client = findClient(clientsData.clients, locationId);
     const apiKey = resolveLocationKey(client);
+    if (!apiKey) return res.json({ opportunities: [], total: 0 });
     const headers = locationHeaders(apiKey);
 
     let allOpps = [];
@@ -272,109 +316,155 @@ app.get('/api/locations/:locationId/opportunities', async (req, res) => {
   }
 });
 
-// ─── GET /api/locations/:locationId/calls ────────────────────────────────────
-// Bug 3 fix: after building call list, sequentially fetches message details
-// (300ms delay) to populate duration and messageId on each call object.
-// Results cached 5 min.
+// ─── Core calls refresh (used directly and as stale-while-revalidate background task) ──
+async function doCallsRefresh(locationId, extend = false) {
+  const clientsData = await loadClientsConfig();
+  const client = findClient(clientsData.clients, locationId);
+  const apiKey = resolveLocationKey(client);
+  if (!apiKey) return null;
+
+  const callHeaders = {
+    Authorization: `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+    Version: '2021-07-28',
+  };
+
+  // max 2 pages (200 calls) on first fetch; max 5 pages (500) when extend=1
+  const maxPages = extend ? 5 : 2;
+  let allConvs = [];
+  let callPage = 1;
+  let hasMore = false;
+  let keepFetchingCalls = true;
+
+  while (keepFetchingCalls) {
+    const pageUrl = `${GHL_API}/conversations/search?locationId=${locationId}&lastMessageType=TYPE_CALL&limit=100&page=${callPage}&sortBy=last_message_date&sortOrder=desc`;
+    let pageData;
+    let attempt = 0;
+    while (attempt < 3) {
+      attempt++;
+      const r = await fetch(pageUrl, { headers: callHeaders });
+      if (r.status === 429) { await sleep(attempt * 3000); continue; }
+      if (!r.ok) { keepFetchingCalls = false; break; }
+      pageData = await r.json();
+      break;
+    }
+    if (!pageData) break;
+    const pageConvs = Array.isArray(pageData.conversations) ? pageData.conversations : [];
+    allConvs = allConvs.concat(pageConvs);
+    if (pageConvs.length < 100 || callPage >= maxPages) {
+      if (pageConvs.length === 100 && callPage >= maxPages) hasMore = true;
+      keepFetchingCalls = false;
+    } else {
+      callPage++;
+      await sleep(300);
+    }
+  }
+
+  const callObjects = allConvs.map(conv => ({
+    conversationId: conv.id,
+    messageId: null,
+    contactName: conv.contactName || conv.fullName || null,
+    contactId:   conv.contactId || null,
+    phone:       conv.phone || conv.lastMessageBody || null,
+    direction:   (conv.lastMessageDirection || '').toLowerCase(),
+    dateAdded:   conv.lastMessageDate || null,
+    duration:    null,
+    status:      conv.lastMessageType || null,
+    userId:      conv.assignedTo || null,
+    locationId,
+  }));
+
+  // Cache-first enrichment: skip API call for convos enriched within last 7 days
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  const needsEnrichment = [];
+  callObjects.forEach(co => {
+    const cached = callEnrichmentCache.get(co.conversationId);
+    if (cached && (Date.now() - new Date(cached.enrichedAt).getTime()) < SEVEN_DAYS_MS) {
+      co.messageId = cached.messageId;
+      co.duration  = cached.duration;
+      if (cached.status) co.status = cached.status;
+      if (!co.userId && cached.userId) co.userId = cached.userId;
+    } else {
+      needsEnrichment.push(co);
+    }
+  });
+
+  console.log(`[calls] ${locationId}: ${callObjects.length - needsEnrichment.length} from enrichment cache, ${needsEnrichment.length} need API fetch`);
+
+  let newEnrichCount = 0;
+  await enrichWithConcurrency(needsEnrichment, async (co) => {
+    let msgRes = await fetch(`${GHL_API}/conversations/${co.conversationId}/messages`, { headers: callHeaders });
+    if (msgRes.status === 429) {
+      await sleep(3000);
+      msgRes = await fetch(`${GHL_API}/conversations/${co.conversationId}/messages`, { headers: callHeaders });
+    }
+    if (!msgRes.ok) return;
+    const msgData = await msgRes.json();
+    const messages = Array.isArray(msgData.messages?.messages) ? msgData.messages.messages
+      : Array.isArray(msgData.messages) ? msgData.messages : [];
+    const callMsg = messages.find(m => m.type === 1 || m.messageType === 'TYPE_CALL');
+    if (callMsg) {
+      co.messageId = callMsg.id || callMsg.messageId || null;
+      co.duration  = callMsg.meta?.call?.duration ?? callMsg.meta?.callDuration ?? null;
+      const callStatus = callMsg.meta?.call?.status || null;
+      if (!co.userId && callMsg.userId) co.userId = callMsg.userId;
+      callEnrichmentCache.set(co.conversationId, {
+        messageId:  co.messageId,
+        duration:   co.duration,
+        status:     callStatus,
+        userId:     co.userId,
+        enrichedAt: new Date().toISOString(),
+      });
+      newEnrichCount++;
+      if (newEnrichCount % 50 === 0) await persistCallEnrichmentCache();
+    }
+  }, 8);
+
+  if (newEnrichCount > 0) await persistCallEnrichmentCache();
+
+  const nullDur = callObjects.filter(c => c.duration === null).length;
+  console.log(`[calls] ${locationId} done — ${callObjects.length} calls, ${nullDur} null duration, ${newEnrichCount} newly enriched, hasMore=${hasMore}`);
+
+  const responseData = { calls: callObjects, total: callObjects.length, hasMore };
+  callsCache.set(locationId, { data: responseData, timestamp: Date.now() });
+  return responseData;
+}
+
+// ─── GET /api/locations/:locationId/calls ─────────────────────────────────────
+// Stale-while-revalidate: returns cached data immediately, refreshes in background.
+// Blocks only on first cold-cache request for a location.
 app.get('/api/locations/:locationId/calls', async (req, res) => {
   try {
     const { locationId } = req.params;
-
+    const extend = req.query.extend === '1';
     const cached = callsCache.get(locationId);
-    if (cached && (Date.now() - cached.timestamp) < 5 * 60 * 1000) {
+    const isStale = !cached || (Date.now() - cached.timestamp) >= 5 * 60 * 1000;
+
+    if (cached) {
+      if (isStale && !refreshingLocations.has(locationId)) {
+        refreshingLocations.add(locationId);
+        doCallsRefresh(locationId, extend)
+          .catch(e => console.error('[calls] background refresh error:', e.message))
+          .finally(() => refreshingLocations.delete(locationId));
+      }
       return res.json(cached.data);
     }
 
-    const clientsData = await loadClientsConfig();
-    const client = findClient(clientsData.clients, locationId);
-    const apiKey = resolveLocationKey(client);
-
-    const callHeaders = {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      Version: '2021-07-28',
-    };
-
-    // Paginate calls up to 500 using page numbers (limit=100 per page)
-    let allConvs = [];
-    let callPage = 1;
-    let keepFetchingCalls = true;
-    while (keepFetchingCalls) {
-      const pageUrl = `${GHL_API}/conversations/search?locationId=${locationId}&lastMessageType=TYPE_CALL&limit=100&page=${callPage}&sortBy=last_message_date&sortOrder=desc`;
-      let pageData;
-      let attempt = 0;
-      while (attempt < 3) {
-        attempt++;
-        const r = await fetch(pageUrl, { headers: callHeaders });
-        if (r.status === 429) { await sleep(attempt * 3000); continue; }
-        if (!r.ok) { keepFetchingCalls = false; break; }
-        pageData = await r.json();
-        break;
-      }
-      if (!pageData) break;
-      const pageConvs = Array.isArray(pageData.conversations) ? pageData.conversations : [];
-      allConvs = allConvs.concat(pageConvs);
-      if (pageConvs.length < 100 || allConvs.length >= 500) {
-        keepFetchingCalls = false;
-      } else {
-        callPage++;
-        await sleep(300);
-      }
-    }
-    const convs = allConvs.slice(0, 500);
-
-    const callObjects = convs.map(conv => ({
-      conversationId: conv.id,
-      messageId: null,
-      contactName: conv.contactName || conv.fullName || null,
-      contactId: conv.contactId || null,
-      phone: conv.phone || conv.lastMessageBody || null,
-      direction: (conv.lastMessageDirection || '').toLowerCase(),
-      dateAdded: conv.lastMessageDate || null,
-      duration: null,
-      status: conv.lastMessageType || null,
-      userId: conv.assignedTo || null,
-      locationId,
-    }));
-
-    // Bug 3 fix: fetch TYPE_CALL message details (duration, messageId) sequentially
-    // with 300ms delay to avoid rate limits
-    console.log(`[calls] ${locationId}: fetching message details for ${callObjects.length} calls...`);
-    for (let i = 0; i < callObjects.length; i++) {
-      const co = callObjects[i];
+    // No cache yet — must block until data is ready
+    if (!refreshingLocations.has(locationId)) {
+      refreshingLocations.add(locationId);
       try {
-        await sleep(300);
-        let msgRes = await fetch(`${GHL_API}/conversations/${co.conversationId}/messages`, { headers: callHeaders });
-        if (msgRes.status === 429) {
-          console.warn(`[calls] 429 rate limit on conv ${co.conversationId}, waiting 3s...`);
-          await sleep(3000);
-          msgRes = await fetch(`${GHL_API}/conversations/${co.conversationId}/messages`, { headers: callHeaders });
-        }
-        if (!msgRes.ok) {
-          console.warn(`[calls] conv ${co.conversationId} messages returned ${msgRes.status}`);
-          continue;
-        }
-        const msgData = await msgRes.json();
-        const messages = Array.isArray(msgData.messages?.messages) ? msgData.messages.messages
-          : Array.isArray(msgData.messages) ? msgData.messages : [];
-        const callMsg = messages.find(m => m.type === 1 || m.messageType === 'TYPE_CALL');
-        if (callMsg) {
-          co.messageId = callMsg.id || callMsg.messageId || null;
-          co.duration  = callMsg.meta?.call?.duration ?? callMsg.meta?.callDuration ?? null;
-          // Use message-level userId if conversation-level assignedTo was null
-          if (!co.userId && callMsg.userId) co.userId = callMsg.userId;
-        }
-      } catch (e) {
-        console.warn(`[calls] failed to fetch messages for conv ${co.conversationId}:`, e.message);
+        await doCallsRefresh(locationId, extend);
+      } finally {
+        refreshingLocations.delete(locationId);
       }
+    } else {
+      // Concurrent request — wait briefly then serve from whatever cache exists
+      await sleep(2000);
     }
 
-    const nullDur = callObjects.filter(c => c.duration === null).length;
-    console.log(`[calls] ${locationId} done — ${callObjects.length} calls, ${nullDur} with null duration`);
-
-    const responseData = { calls: callObjects, total: callObjects.length };
-    callsCache.set(locationId, { data: responseData, timestamp: Date.now() });
-    res.json(responseData);
+    const freshCache = callsCache.get(locationId);
+    return res.json(freshCache ? freshCache.data : { calls: [], total: 0, hasMore: false });
   } catch (err) {
     console.error('GET /api/locations/:id/calls error:', err.message);
     res.status(err.status || 500).json({ error: err.message });
@@ -1036,6 +1126,7 @@ app.get('/api/locations/:locationId/sms', async (req, res) => {
     const clientsData = await loadClientsConfig();
     const client = findClient(clientsData.clients, locationId);
     const apiKey = resolveLocationKey(client);
+    if (!apiKey) return res.json({ conversations: [] });
 
     const callHeaders = {
       Authorization: `Bearer ${apiKey}`,
@@ -1292,6 +1383,26 @@ app.get('/debug-wonopps', async (req, res) => {
   }
 });
 
+// ─── GET /api/refresh-status ─────────────────────────────────────────────────
+app.get('/api/refresh-status', (req, res) => {
+  res.json({ refreshing: Array.from(refreshingLocations) });
+});
+
+// ─── GET /api/debug/cache-stats ──────────────────────────────────────────────
+app.get('/api/debug/cache-stats', (req, res) => {
+  const now = Date.now();
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  let freshCount = 0, staleCount = 0;
+  let oldestEntry = null, newestEntry = null;
+  callEnrichmentCache.forEach(entry => {
+    const t = new Date(entry.enrichedAt).getTime();
+    if (now - t < SEVEN_DAYS_MS) freshCount++; else staleCount++;
+    if (!oldestEntry || t < new Date(oldestEntry).getTime()) oldestEntry = entry.enrichedAt;
+    if (!newestEntry || t > new Date(newestEntry).getTime()) newestEntry = entry.enrichedAt;
+  });
+  res.json({ totalCached: callEnrichmentCache.size, freshCount, staleCount, oldestEntry, newestEntry });
+});
+
 // ─── Static files + SPA fallback (MUST be last — after all /api/* routes) ───
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res) => {
@@ -1299,6 +1410,8 @@ app.get('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Revryze Dashboard running on http://0.0.0.0:${PORT}`);
+loadCallEnrichmentCache().then(() => {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Revryze Dashboard running on http://0.0.0.0:${PORT}`);
+  });
 });
