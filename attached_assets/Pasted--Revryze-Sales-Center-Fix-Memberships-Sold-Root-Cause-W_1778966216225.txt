@@ -1,0 +1,266 @@
+# Revryze Sales Center — Fix Memberships Sold (Root Cause: Won Opps Truncated by 500 Cap)
+
+The "Memberships Sold" metric is dramatically undercounted because the opportunities fetcher hits a hard 500-opp cap per pipeline. GHL returns opps newest-first across ALL stages, so for a presale pipeline with thousands of leads, the older Closed Won deals get silently dropped off the end of pagination. Fix that, decouple sold from the date filter, and correct two rep IDs.
+
+Apply ALL changes in one pass.
+
+---
+
+## Change 1 — Fix two transcribed rep `userId`s in `reps-config.json`
+
+Two rep IDs were transcribed wrong from screenshots. The correct values are confirmed against the actual GHL user IDs already present in `calls-cache.json`:
+
+- **Mallorie Baker** — change `userId` from `oabT68dsQoFltr4U6YMN` to **`oabT68dsQoFItr4U6YMN`** (8th character is capital I, not lowercase l)
+- **Stefanie Gold** — change `userId` from `WNgoIMUX6p5jBzqdIQdM` to **`WNgoIMUX6p5jBzqdlQdM`** (16th character is lowercase l, not capital I)
+
+After saving, hit `GET /api/debug/repids` and both should show `matchFound: true` with `callCount > 0`.
+
+---
+
+## Change 2 — Fetch ALL won opps separately with `status=won` filter (root cause fix)
+
+This is the headline fix. GHL's opportunities API supports filtering by status server-side. Use that to guarantee every Closed Won deal is fetched, completely independently from the regular all-opps pagination.
+
+### New helper in `server.js` — add right next to `fetchAllOpportunities()`:
+
+```javascript
+// Fetch EVERY won opportunity for a location/pipeline. No 500 cap.
+// Uses the GHL `&status=won` filter so pagination is never consumed by leads in other stages.
+async function fetchAllWonOpportunities(locationId, pipelineId, headers) {
+  let allWon = [];
+  let startAfterId = null;
+  let keepGoing = true;
+
+  while (keepGoing) {
+    let url = `${GHL_API}/opportunities/search?location_id=${locationId}&status=won&limit=100`;
+    if (pipelineId) url += `&pipeline_id=${encodeURIComponent(pipelineId)}`;
+    if (startAfterId) url += `&startAfterId=${encodeURIComponent(startAfterId)}`;
+
+    let data;
+    let attempt = 0;
+    while (attempt < 3) {
+      attempt++;
+      const r = await fetch(url, { headers });
+      if (r.status === 429) { await sleep(attempt * 3000); continue; }
+      if (!r.ok) { keepGoing = false; break; }
+      data = await r.json();
+      break;
+    }
+    if (!data) break;
+
+    const opps = data.opportunities || [];
+    allWon = allWon.concat(opps);
+    console.log(`[wonOpps] ${locationId}${pipelineId ? '/' + pipelineId : ''} won page fetched ${opps.length}, total won: ${allWon.length}`);
+
+    if (opps.length < 100) keepGoing = false;
+    else {
+      startAfterId = opps[opps.length - 1].id;
+      await sleep(250);
+    }
+
+    // Sanity ceiling — if we ever hit this, log a warning but don't pretend the data is complete
+    if (allWon.length >= 5000) {
+      console.warn(`[wonOpps] ${locationId} hit 5000 won-opp safety ceiling — data may be incomplete`);
+      keepGoing = false;
+    }
+  }
+
+  return allWon;
+}
+```
+
+### Update `/api/locations/:locationId/opportunities` to use the new helper
+
+Inside that endpoint, after fetching the regular all-opps array (keep the existing logic — that data is still needed for the pipeline funnel and other features), do a second pass with the new helper that fetches every won opp, then merge with dedupe by `id`:
+
+```javascript
+// Fetch the regular all-opps array first (capped at 500 — fine for pipeline funnel display)
+let allOpps = [];
+if (!pipelineId && client.pipelines && client.pipelines.length > 0) {
+  for (const pipeline of client.pipelines) {
+    const pOpps = await fetchAllOpportunities(locationId, pipeline.pipelineId, headers);
+    allOpps = allOpps.concat(pOpps);
+    await sleep(300);
+  }
+} else {
+  allOpps = await fetchAllOpportunities(locationId, pipelineId || null, headers);
+}
+
+// CRITICAL: fetch every won opp separately so none are truncated by the 500 cap
+let allWon = [];
+if (!pipelineId && client.pipelines && client.pipelines.length > 0) {
+  for (const pipeline of client.pipelines) {
+    const pWon = await fetchAllWonOpportunities(locationId, pipeline.pipelineId, headers);
+    allWon = allWon.concat(pWon);
+    await sleep(300);
+  }
+} else {
+  allWon = await fetchAllWonOpportunities(locationId, pipelineId || null, headers);
+}
+
+// Merge — won opps take priority (they are the source of truth for sold count)
+const byId = new Map();
+allWon.forEach(o => byId.set(o.id, o));
+allOpps.forEach(o => { if (!byId.has(o.id)) byId.set(o.id, o); });
+
+// Deduplicate
+const merged = Array.from(byId.values());
+const seen = new Set();
+const finalOpps = merged.filter(o => {
+  if (seen.has(o.id)) return false;
+  seen.add(o.id);
+  return true;
+});
+
+const wonCount = finalOpps.filter(o => o.status === 'won').length;
+console.log(`[opps] ${locationId} combined — ${finalOpps.length} total, ${wonCount} won (from ${allWon.length} won-fetched)`);
+
+const responseData = { opportunities: finalOpps, total: finalOpps.length, wonTotal: wonCount };
+oppsCache.set(cacheKey, { data: responseData, timestamp: Date.now() });
+res.json(responseData);
+```
+
+### Clear stale opps cache on server start
+
+Add this near the top of `server.js`, right after the `oppsCache = new Map()` declaration, so old wrong cached data from before this fix is wiped clean on restart:
+
+```javascript
+// Wipe oppsCache on every cold start so any stale, truncated data from before
+// the won-opp pagination fix is purged immediately.
+console.log('[opps] cleared oppsCache on cold start');
+```
+
+(The Map is already empty on startup — this is just a confirmation log. The cache is in-memory only.)
+
+### Defensive: also match by stage name
+
+In case any won opps come back with `status: "open"` but live in a "Closed Won" stage (rare GHL edge case), make the `status === 'won'` check more forgiving. In `public/app.js`, add a helper at the top of the file:
+
+```javascript
+function isWonOpp(o) {
+  if ((o.status || '').toLowerCase() === 'won') return true;
+  const stageName = (o.pipelineStageName || '').toLowerCase();
+  if (stageName === 'closed won' || stageName === 'won' || stageName.includes('closed won')) return true;
+  return false;
+}
+```
+
+Replace every existing `(o.status || '').toLowerCase() === 'won'` check in `app.js` with `isWonOpp(o)`. This includes `filteredWonOpps()`, `getWonDate()`, `buildContactMaps()`, the rep profile stats block in `openRepProfile()`, and any other spot.
+
+---
+
+## Change 3 — Decouple Memberships Sold from the date filter
+
+A sold membership stays sold regardless of when it closed. The date filter must NOT touch the Memberships Sold or Revenue Closed numbers — only activity metrics (calls, talk time, close rate).
+
+### `filteredWonOpps()` in `app.js`
+
+Remove the `lastStageChangeAt` cutoff filter. The function becomes:
+
+```javascript
+function filteredWonOpps() {
+  return appData.opportunities.filter(o => {
+    if (!isWonOpp(o)) return false;
+    if (ccFilters.clientId !== 'all' && o.locationId !== ccFilters.clientId) return false;
+    if (ccFilters.pipelineId !== 'all' && o.pipelineId !== ccFilters.pipelineId) return false;
+    if (myViewRepId && getOppRepId(o) !== myViewRepId) return false;
+    return true;
+  });
+}
+```
+
+### Close Rate stays date-windowed on BOTH sides
+
+In `renderCommandCenter()`, compute a separate `dateWindowedWonCount` for the close-rate calculation only:
+
+```javascript
+const cutoff = getDateCutoff(ccFilters.days);
+const dateWindowedWon = wonOpps.filter(o => {
+  const d = parseDate(o.lastStageChangeAt);
+  return d && d >= cutoff;
+});
+// Close Rate = (won opps in date window) / (unique contacts called in date window) × 100
+const uniqueContactsCalled = new Set(calls.map(c => c.contactId).filter(Boolean)).size;
+let closeRate = '—';
+if (uniqueContactsCalled > 0) {
+  const raw = (dateWindowedWon.length / uniqueContactsCalled) * 100;
+  if (raw <= 100) closeRate = raw.toFixed(1) + '%';
+}
+```
+
+### Client Leaderboard
+
+Sold and Revenue columns become all-time. Close Rate column uses date-windowed both sides (same approach). Calls column stays date-filtered. Implementation lives inside `renderClientLeaderboard()` — apply the same `dateWindowedWon` filtering for close rate only.
+
+### Rep Leaderboard
+
+Leave alone. Rep-level sold counts stay date-filtered (this is activity tracking; SPIFF gives the weekly view).
+
+### UI label hints in `index.html`
+
+Under each metric card's existing label, add a tiny sub-line in `var(--sub)` text (9px, margin-top 2px, opacity 0.7):
+
+- Memberships Sold → `All time`
+- Revenue Closed → `All time`
+- Total Calls → `Date range`
+- Talk Time → `Date range`
+- Close Rate → `Date range`
+
+---
+
+## Change 4 — Add `/api/debug/sold-breakdown` for verification
+
+Returns the ground-truth won count from GHL for every pipeline. Lets us reconcile dashboard vs reality with one URL hit.
+
+```
+GET /api/debug/sold-breakdown
+```
+
+Response:
+
+```json
+{
+  "clients": [
+    {
+      "client": "STRONG Pilates — Momentic",
+      "locationId": "9oW28j2SxdPAmUhO5MDI",
+      "pipelines": [
+        {
+          "name": "Highland Village",
+          "pipelineId": "udyl3lJvKs31tt6O01SZ",
+          "wonTotal": 42,
+          "monetaryValueTotal": 8400
+        }
+      ],
+      "clientTotalWon": 87
+    }
+  ],
+  "grandTotalWon": 110
+}
+```
+
+Implementation: for each client with an API key, call `fetchAllWonOpportunities()` for every configured pipeline. Sum `monetaryValue` only when `> 0`. For clients with `pipelines: []`, call `fetchAllWonOpportunities(locationId, null, headers)` for one synthetic row. Skip clients with missing env vars — include `"apiKey": "missing"` in the response instead of throwing.
+
+---
+
+## Verification (after applying everything)
+
+1. **Hit `/api/debug/sold-breakdown` first.** The `grandTotalWon` is the source-of-truth number from GHL. Note it.
+2. Refresh the dashboard, set filters to "All clients / All pipelines / Last 30 days".
+3. **Memberships Sold (top metric) MUST equal `grandTotalWon`.** Not approximately — exactly.
+4. The Client Leaderboard pipeline rows' Sold values sum (with any Unattributed row) to `grandTotalWon`.
+5. Change the date filter from 30 to 7 to 90 days — Memberships Sold and Revenue Closed do NOT change. Only Total Calls, Talk Time, and Close Rate change.
+6. `GET /api/debug/repids` — Mallorie and Stefanie both show `matchFound: true` and `callCount > 0`.
+7. Highland Village appears in the Client Leaderboard with its actual all-time sold count.
+8. Check the server console after a refresh — the `[wonOpps]` log lines should show the won-opp counts for every pipeline. Add them up; they should match `grandTotalWon`.
+
+---
+
+## Do not change
+
+- Pipeline-as-location restructure (the leaderboard already breaks out pipelines correctly)
+- Cache layer for calls (`callsCache`, `callEnrichmentCache`, `calls-cache.json`, stale-while-revalidate)
+- Rep profile slide-in panel, AI analysis, manager notes, Weekly SPIFF, SMS thread UI
+- The 7/30/90/custom date filter dropdown control (we're only changing what it filters)
+
+Write every file completely. No placeholders, no TODOs.

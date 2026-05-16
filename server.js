@@ -242,6 +242,50 @@ async function fetchAllOpportunities(locationId, pipelineId, headers) {
   return allOpps;
 }
 
+// Fetch EVERY won opportunity for a location/pipeline — no 500 cap.
+// Uses the GHL &status=won server-side filter so pagination is never consumed by leads.
+async function fetchAllWonOpportunities(locationId, pipelineId, headers) {
+  let allWon = [];
+  let startAfterId = null;
+  let keepGoing = true;
+
+  while (keepGoing) {
+    let url = `${GHL_API}/opportunities/search?location_id=${locationId}&status=won&limit=100`;
+    if (pipelineId) url += `&pipeline_id=${encodeURIComponent(pipelineId)}`;
+    if (startAfterId) url += `&startAfterId=${encodeURIComponent(startAfterId)}`;
+
+    let data;
+    let attempt = 0;
+    while (attempt < 3) {
+      attempt++;
+      const r = await fetch(url, { headers });
+      if (r.status === 429) { await sleep(attempt * 3000); continue; }
+      if (!r.ok) { keepGoing = false; break; }
+      data = await r.json();
+      break;
+    }
+    if (!data) break;
+
+    const opps = data.opportunities || [];
+    allWon = allWon.concat(opps);
+    console.log(`[wonOpps] ${locationId}${pipelineId ? '/' + pipelineId : ''} page fetched ${opps.length}, total won: ${allWon.length}`);
+
+    if (opps.length < 100) {
+      keepGoing = false;
+    } else {
+      startAfterId = opps[opps.length - 1].id;
+      await sleep(250);
+    }
+
+    if (allWon.length >= 5000) {
+      console.warn(`[wonOpps] ${locationId} hit 5000 won-opp safety ceiling — data may be incomplete`);
+      keepGoing = false;
+    }
+  }
+
+  return allWon;
+}
+
 // ─── GET /api/setup/pipelines/:locationId ───────────────────────────────────
 // Dev helper: uses location-specific key to list pipelines for a location
 app.get('/api/setup/pipelines/:locationId', async (req, res) => {
@@ -286,28 +330,45 @@ app.get('/api/locations/:locationId/opportunities', async (req, res) => {
 
     let allOpps = [];
 
-    // When no specific pipeline requested, fetch ALL client pipelines and combine
+    // Fetch the regular all-opps array (capped at 500 — fine for pipeline funnel display)
     if (!pipelineId && client.pipelines && client.pipelines.length > 0) {
       for (const pipeline of client.pipelines) {
         const pOpps = await fetchAllOpportunities(locationId, pipeline.pipelineId, headers);
         allOpps = allOpps.concat(pOpps);
         await sleep(300);
       }
-      // Deduplicate by opp id
-      const seen = new Set();
-      allOpps = allOpps.filter(o => {
-        if (seen.has(o.id)) return false;
-        seen.add(o.id);
-        return true;
-      });
     } else {
       allOpps = await fetchAllOpportunities(locationId, pipelineId || null, headers);
     }
 
-    const wonCount = allOpps.filter(o => o.status === 'won').length;
-    console.log(`[opps] ${locationId} combined — ${allOpps.length} total, ${wonCount} won`);
+    // CRITICAL: fetch every won opp separately so none are truncated by the 500 cap
+    let allWon = [];
+    if (!pipelineId && client.pipelines && client.pipelines.length > 0) {
+      for (const pipeline of client.pipelines) {
+        const pWon = await fetchAllWonOpportunities(locationId, pipeline.pipelineId, headers);
+        allWon = allWon.concat(pWon);
+        await sleep(300);
+      }
+    } else {
+      allWon = await fetchAllWonOpportunities(locationId, pipelineId || null, headers);
+    }
 
-    const responseData = { opportunities: allOpps, total: allOpps.length };
+    // Merge — won opps take priority (they are the source of truth for sold count)
+    const byId = new Map();
+    allWon.forEach(o => byId.set(o.id, o));
+    allOpps.forEach(o => { if (!byId.has(o.id)) byId.set(o.id, o); });
+    const merged = Array.from(byId.values());
+    const seen = new Set();
+    const finalOpps = merged.filter(o => {
+      if (seen.has(o.id)) return false;
+      seen.add(o.id);
+      return true;
+    });
+
+    const wonCount = finalOpps.filter(o => o.status === 'won').length;
+    console.log(`[opps] ${locationId} combined — ${finalOpps.length} total, ${wonCount} won (from ${allWon.length} won-fetched)`);
+
+    const responseData = { opportunities: finalOpps, total: finalOpps.length, wonTotal: wonCount };
     oppsCache.set(cacheKey, { data: responseData, timestamp: Date.now() });
     res.json(responseData);
   } catch (err) {
@@ -1379,6 +1440,49 @@ app.get('/debug-wonopps', async (req, res) => {
       })),
     });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/debug/sold-breakdown ───────────────────────────────────────────
+app.get('/api/debug/sold-breakdown', async (req, res) => {
+  try {
+    const clientsData = await loadClientsConfig();
+    const result = [];
+    let grandTotalWon = 0;
+
+    for (const cl of clientsData.clients) {
+      const apiKey = resolveLocationKey(cl);
+      if (!apiKey) {
+        result.push({ client: cl.name, locationId: cl.locationId, apiKey: 'missing', pipelines: [], clientTotalWon: 0 });
+        continue;
+      }
+      const headers = locationHeaders(apiKey);
+      const pipelines = [];
+      let clientTotalWon = 0;
+
+      if (!cl.pipelines || cl.pipelines.length === 0) {
+        const won = await fetchAllWonOpportunities(cl.locationId, null, headers);
+        const monetaryValueTotal = won.reduce((s, o) => s + (o.monetaryValue > 0 ? o.monetaryValue : 0), 0);
+        pipelines.push({ name: '(default)', pipelineId: null, wonTotal: won.length, monetaryValueTotal });
+        clientTotalWon = won.length;
+      } else {
+        for (const p of cl.pipelines) {
+          const won = await fetchAllWonOpportunities(cl.locationId, p.pipelineId, headers);
+          const monetaryValueTotal = won.reduce((s, o) => s + (o.monetaryValue > 0 ? o.monetaryValue : 0), 0);
+          pipelines.push({ name: p.name, pipelineId: p.pipelineId, wonTotal: won.length, monetaryValueTotal });
+          clientTotalWon += won.length;
+          await sleep(300);
+        }
+      }
+
+      grandTotalWon += clientTotalWon;
+      result.push({ client: cl.name, locationId: cl.locationId, pipelines, clientTotalWon });
+    }
+
+    res.json({ clients: result, grandTotalWon });
+  } catch (err) {
+    console.error('GET /api/debug/sold-breakdown error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

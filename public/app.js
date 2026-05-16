@@ -241,9 +241,14 @@
     return c ? c.name : locId;
   }
 
-  // Fix 1: Use lastStageChangeAt as win date for SPIFF
+  function isWonOpp(o) {
+    if ((o.status || '').toLowerCase() === 'won') return true;
+    const stageName = (o.pipelineStageName || '').toLowerCase();
+    return stageName === 'closed won' || stageName === 'won' || stageName.includes('closed won');
+  }
+
   function getWonDate(opp) {
-    if ((opp.status || '').toLowerCase() !== 'won') return null;
+    if (!isWonOpp(opp)) return null;
     return parseDate(opp.lastStageChangeAt || opp.dateUpdated || opp.dateAdded);
   }
 
@@ -263,7 +268,7 @@
       if (!o.contactId) return;
       if (!appData.allContactOppMap[o.contactId]) appData.allContactOppMap[o.contactId] = [];
       appData.allContactOppMap[o.contactId].push(o);
-      if ((o.status || '').toLowerCase() === 'won') {
+      if (isWonOpp(o)) {
         appData.contactWonSet.add(o.contactId);
       }
     });
@@ -536,15 +541,12 @@
     });
   }
 
-  // Fix 1: Won opps filtered by lastStageChangeAt (not dateAdded)
+  // Won opps are all-time — date filter applies only to activity metrics (calls/talktime/close rate)
   function filteredWonOpps() {
-    const cutoff = getDateCutoff(ccFilters.days);
     return appData.opportunities.filter(o => {
-      if ((o.status || '').toLowerCase() !== 'won') return false;
+      if (!isWonOpp(o)) return false;
       if (ccFilters.clientId !== 'all' && o.locationId !== ccFilters.clientId) return false;
       if (ccFilters.pipelineId !== 'all' && o.pipelineId !== ccFilters.pipelineId) return false;
-      const d = parseDate(o.lastStageChangeAt);
-      if (!d || d < cutoff) return false;
       if (myViewRepId && getOppRepId(o) !== myViewRepId) return false;
       return true;
     });
@@ -562,22 +564,25 @@
   }
 
   function renderCommandCenter() {
-    // Fix 1: Use lastStageChangeAt for won opps; Fix 3: only count monetaryValue > 0
-    const wonOpps    = filteredWonOpps();
-    const calls      = filteredCallsCC();
+    const wonOpps    = filteredWonOpps();   // all-time — sold + revenue
+    const calls      = filteredCallsCC();   // date-windowed — calls/talktime/close rate
     const sold       = wonOpps.length;
     const revenue    = wonOpps.reduce((s, o) => s + (o.monetaryValue > 0 ? o.monetaryValue : 0), 0);
     const totalCalls = calls.length;
     const talkSec    = calls.reduce((s, c) => s + getCallDuration(c), 0);
 
-    // Close rate = won ÷ unique contacts called (not total call count)
-    // A contact may be called multiple times; each unique contact = one sales opportunity
+    // Close rate: date-windowed won ÷ unique contacts called in the same date window
+    const cutoff = getDateCutoff(ccFilters.days);
+    const dateWindowedWon = wonOpps.filter(o => {
+      const d = parseDate(o.lastStageChangeAt);
+      return d && d >= cutoff;
+    });
     const uniqueContactsCalled = new Set(calls.map(c => c.contactId).filter(Boolean)).size;
     let closeRate = '—';
     if (uniqueContactsCalled > 0) {
-      const raw = (sold / uniqueContactsCalled) * 100;
+      const raw = (dateWindowedWon.length / uniqueContactsCalled) * 100;
       if (raw > 100) {
-        console.warn('[closeRate] exceeds 100% — sold:', sold, 'uniqueContacts:', uniqueContactsCalled, 'raw:', raw.toFixed(1) + '%');
+        console.warn('[closeRate] exceeds 100% — won:', dateWindowedWon.length, 'uniqueContacts:', uniqueContactsCalled, 'raw:', raw.toFixed(1) + '%');
       } else {
         closeRate = raw.toFixed(1) + '%';
       }
@@ -659,17 +664,25 @@
 
     const rows = [];
 
+    // Date-windowed won opps for close rate only (sold/rev stay all-time)
+    const cutoff = getDateCutoff(ccFilters.days);
+    const dwWonOpps = wonOpps.filter(o => {
+      const d = parseDate(o.lastStageChangeAt);
+      return d && d >= cutoff;
+    });
+
     clients.forEach(cl => {
       const clOpps    = appData.opportunities.filter(o => o.locationId === cl.locationId);
-      const clWonOpps = wonOpps.filter(o => o.locationId === cl.locationId);
-      const clCalls   = calls.filter(c => c._clientId === cl.locationId);
+      const clWonOpps = wonOpps.filter(o => o.locationId === cl.locationId);      // all-time
+      const clDwWon   = dwWonOpps.filter(o => o.locationId === cl.locationId);    // date-windowed
+      const clCalls   = calls.filter(c => c._clientId === cl.locationId);         // date-windowed
 
       if (!cl.pipelines || cl.pipelines.length === 0) {
-        const sold  = clWonOpps.length;
-        const rev   = clWonOpps.reduce((s, o) => s + (o.monetaryValue > 0 ? o.monetaryValue : 0), 0);
+        const sold   = clWonOpps.length;
+        const rev    = clWonOpps.reduce((s, o) => s + (o.monetaryValue > 0 ? o.monetaryValue : 0), 0);
         const nCalls = clCalls.length;
         let rate = '—';
-        if (nCalls > 0) { const raw = (sold / nCalls) * 100; if (raw <= 100) rate = raw.toFixed(1) + '%'; }
+        if (nCalls > 0) { const raw = (clDwWon.length / nCalls) * 100; if (raw <= 100) rate = raw.toFixed(1) + '%'; }
         rows.push({ type: 'client', label: cl.name, sublabel: null, sold, rev, rate, nCalls, locationId: cl.locationId, pipelineId: null });
         return;
       }
@@ -699,13 +712,14 @@
       });
 
       cl.pipelines.forEach(p => {
-        const pWon   = clWonOpps.filter(o => o.pipelineId === p.pipelineId);
-        const pCalls = callsByPipeline[p.pipelineId] || [];
-        const sold   = pWon.length;
-        const rev    = pWon.reduce((s, o) => s + (o.monetaryValue > 0 ? o.monetaryValue : 0), 0);
-        const nCalls = pCalls.length;
+        const pWon    = clWonOpps.filter(o => o.pipelineId === p.pipelineId);     // all-time
+        const pDwWon  = clDwWon.filter(o => o.pipelineId === p.pipelineId);       // date-windowed
+        const pCalls  = callsByPipeline[p.pipelineId] || [];
+        const sold    = pWon.length;
+        const rev     = pWon.reduce((s, o) => s + (o.monetaryValue > 0 ? o.monetaryValue : 0), 0);
+        const nCalls  = pCalls.length;
         let rate = '—';
-        if (nCalls > 0) { const raw = (sold / nCalls) * 100; if (raw <= 100) rate = raw.toFixed(1) + '%'; }
+        if (nCalls > 0) { const raw = (pDwWon.length / nCalls) * 100; if (raw <= 100) rate = raw.toFixed(1) + '%'; }
         rows.push({ type: 'pipeline', label: p.name, sublabel: cl.name, sold, rev, rate, nCalls, locationId: cl.locationId, pipelineId: p.pipelineId });
       });
 
@@ -1466,9 +1480,7 @@
 
     // Stats row
     const repCalls = appData.calls.filter(c => c.userId === repId);
-    const repWon   = appData.opportunities.filter(o =>
-      (o.status || '').toLowerCase() === 'won' && getOppRepId(o) === repId
-    );
+    const repWon   = appData.opportunities.filter(o => isWonOpp(o) && getOppRepId(o) === repId);
     const talkSec  = repCalls.reduce((s, c) => s + getCallDuration(c), 0);
     const sold     = repWon.length;
     const rev      = repWon.reduce((s, o) => s + (o.monetaryValue > 0 ? o.monetaryValue : 0), 0);

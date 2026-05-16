@@ -261,6 +261,12 @@ body {
   font-variant-numeric: tabular-nums;
 }
 .metric-value.accent { color: var(--accent); }
+.metric-sublabel {
+  font-size: 9px;
+  color: var(--sub);
+  margin-top: 2px;
+  opacity: 0.7;
+}
 .metric-label {
   font-size: 11px;
   font-weight: 500;
